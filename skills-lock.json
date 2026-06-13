@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "arbityr": {
+      "source": "anshulLuhsna/arbityr-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "8dacd9664b618a8c366ee4e55b7ed87fec20db762e8565b95d0417a255c17519"
+    }
+  }
+}
