@@ -4,6 +4,11 @@ import { createId, estimateTokens, metadataStringArray } from "./utils.js";
 const errorPattern = /(error|exception|failed|stack trace|traceback|cannot find|enoent|eaddrinuse)/i;
 const instructionPattern = /(must|should|do not|don't|preserve|require|constraint|use |avoid|never|always)/i;
 const artifactPattern = /(?:[\w.-]+\/)+[\w.-]+\.(?:ts|tsx|js|jsx|py|md|json|yml|yaml|css|html|go|rs|java|sql)|\b[\w.-]+\.(?:ts|tsx|js|jsx|py|md|json|yml|yaml|css|html|go|rs|java|sql)\b/g;
+const customerPattern = /(customer|account|email|plan|region|tenant|org|organization|workspace)/i;
+const supportIssuePattern = /(issue|problem|ticket|can't|cannot|unable|billing|invoice|refund|login|outage|downtime|bug|broken)/i;
+const supportPolicyPattern = /(sla|policy|refund|privacy|compliance|terms|entitlement|do not promise|credit|escalat)/i;
+const troubleshootingPattern = /(tried|checked|restarted|cleared cache|reproduced|verified|workaround|step|diagnostic|log)/i;
+const nextActionPattern = /(next action|follow up|todo|need to|ask customer|send|reply|schedule|confirm)/i;
 
 export function segmentEvents(events: SessionEvent[]): ContextSegment[] {
   return events.map((event) => {
@@ -23,7 +28,7 @@ export function segmentEvents(events: SessionEvent[]): ContextSegment[] {
       artifacts,
       importance: scoreImportance(event, semanticType, artifacts.length),
       futureRelevance: scoreFutureRelevance(semanticType, tokenEstimate),
-      exactnessRequired: semanticType === "user_instruction" || semanticType === "active_error",
+      exactnessRequired: semanticType === "user_instruction" || semanticType === "active_error" || semanticType === "support_policy",
       retrievable: event.type === "tool_output" || tokenEstimate > 500,
       reconstructionCost: semanticType === "user_instruction" || semanticType === "active_error" ? "high" : "medium",
       metadata: event.metadata
@@ -46,6 +51,36 @@ function classifySemanticType(event: SessionEvent): SemanticType {
 
   if (event.type === "tool_output" && errorPattern.test(event.content)) {
     return "active_error";
+  }
+
+  if (event.metadata.useCase === "customer_support") {
+    if (event.metadata.semanticType && typeof event.metadata.semanticType === "string") {
+      return event.metadata.semanticType as SemanticType;
+    }
+
+    if (nextActionPattern.test(event.content)) {
+      return "next_action";
+    }
+
+    if (/escalat/i.test(event.content)) {
+      return "escalation_state";
+    }
+
+    if (supportPolicyPattern.test(event.content)) {
+      return "support_policy";
+    }
+
+    if (troubleshootingPattern.test(event.content)) {
+      return "troubleshooting_step";
+    }
+
+    if (customerPattern.test(event.content)) {
+      return "customer_profile";
+    }
+
+    if (supportIssuePattern.test(event.content)) {
+      return "support_issue";
+    }
   }
 
   if (event.type === "tool_output") {
@@ -102,6 +137,14 @@ function scoreImportance(event: SessionEvent, semanticType: SemanticType, artifa
     return 0.88;
   }
 
+  if (semanticType === "customer_profile" || semanticType === "support_issue" || semanticType === "support_policy") {
+    return 0.86;
+  }
+
+  if (semanticType === "escalation_state" || semanticType === "next_action") {
+    return 0.82;
+  }
+
   if (artifactCount > 0) {
     return 0.78;
   }
@@ -120,6 +163,16 @@ function scoreFutureRelevance(semanticType: SemanticType, tokenEstimate: number)
 
   if (semanticType === "decision" || semanticType === "artifact_reference") {
     return 0.8;
+  }
+
+  if (
+    semanticType === "customer_profile" ||
+    semanticType === "support_issue" ||
+    semanticType === "support_policy" ||
+    semanticType === "escalation_state" ||
+    semanticType === "next_action"
+  ) {
+    return 0.82;
   }
 
   if (semanticType === "tool_observation" && tokenEstimate > 300) {

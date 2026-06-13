@@ -1,10 +1,30 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import { compactSession, sessionEventInputSchema, SqliteStore } from "@compaction-orchestrator/core";
+import { cors } from "hono/cors";
+import {
+  buildCustomerSupportContextPackage,
+  compactSession,
+  sessionEventInputSchema,
+  SqliteStore
+} from "@compaction-orchestrator/core";
 import { Hono } from "hono";
 import { z } from "zod";
+import { config as loadDotenv } from "dotenv";
+import { getOpenAIConfig, runOpenAISmokeTest } from "./openai.js";
+
+const envPath = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
+  .find((path) => existsSync(path));
+loadDotenv(envPath ? { path: envPath } : undefined);
 
 const app = new Hono();
 const store = new SqliteStore(process.env.DATABASE_URL ?? "data/compaction-orchestrator.sqlite");
+
+app.use("*", cors({
+  origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+  allowHeaders: ["content-type"],
+  allowMethods: ["GET", "POST", "OPTIONS"]
+}));
 
 const createSessionSchema = z.object({
   name: z.string().optional(),
@@ -26,6 +46,34 @@ const compactRequestSchema = z.object({
 
 app.get("/health", (context) => {
   return context.json({ ok: true, service: "compaction-orchestrator-api" });
+});
+
+app.get("/v1/openai/status", (context) => {
+  const config = getOpenAIConfig();
+  return context.json({
+    configured: config.configured,
+    model: config.model
+  });
+});
+
+app.post("/v1/openai/test", async (context) => {
+  const config = getOpenAIConfig();
+  if (!config.configured) {
+    return context.json({
+      error: "OPENAI_API_KEY is not configured",
+      hint: "Create .env from .env.example and set OPENAI_API_KEY."
+    }, 400);
+  }
+
+  try {
+    const result = await runOpenAISmokeTest();
+    return context.json({ ok: true, ...result });
+  } catch (error) {
+    return context.json({
+      error: "OpenAI smoke test failed",
+      message: error instanceof Error ? error.message : String(error)
+    }, 502);
+  }
 });
 
 app.post("/v1/sessions", async (context) => {
@@ -98,6 +146,35 @@ app.post("/v1/sessions/:sessionId/compact", async (context) => {
   });
 
   store.saveCompaction(output.plan, output.contextView, output.segments);
+  return context.json(output);
+});
+
+app.post("/v1/sessions/:sessionId/context-package", async (context) => {
+  const sessionId = context.req.param("sessionId");
+  if (!store.getSession(sessionId)) {
+    return context.json({ error: "Session not found" }, 404);
+  }
+
+  const body = await context.req.json().catch(() => undefined);
+  const parsed = compactRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return context.json({ error: "Invalid context package payload", issues: parsed.error.issues }, 400);
+  }
+
+  const output = buildCustomerSupportContextPackage({
+    sessionId,
+    events: store.listEvents(sessionId),
+    objective: parsed.data.objective,
+    desiredBudget: parsed.data.desiredBudget,
+    policy: parsed.data.policy
+  });
+
+  store.saveCompaction(
+    output.contextPackage.compactionPlan,
+    output.contextPackage.runtimeContext,
+    output.segments
+  );
+
   return context.json(output);
 });
 

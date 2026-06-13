@@ -10,10 +10,15 @@
   "scripts": {
     "build": "npm run build -w @compaction-orchestrator/core && npm run build -w @compaction-orchestrator/api",
     "dev": "npm run dev -w @compaction-orchestrator/api",
+    "dev:web": "npm run dev -w @compaction-orchestrator/web",
+    "build:web": "npm run build -w @compaction-orchestrator/web",
     "start": "npm run start -w @compaction-orchestrator/api",
-    "typecheck": "npm run typecheck -w @compaction-orchestrator/core && npm run typecheck -w @compaction-orchestrator/api",
+    "typecheck": "npm run typecheck -w @compaction-orchestrator/core && npm run typecheck -w @compaction-orchestrator/api && npm run typecheck -w @compaction-orchestrator/web",
     "test:smoke": "node scripts/smoke-test.mjs",
-    "test:persistence": "node scripts/persistence-test.mjs"
+    "test:persistence": "node scripts/persistence-test.mjs",
+    "demo:support": "node scripts/customer-support-e2e.mjs",
+    "eval:support": "node scripts/evaluate-customer-support.mjs",
+    "openai:check": "node scripts/openai-check.mjs"
   },
   "engines": {
     "node": ">=22"

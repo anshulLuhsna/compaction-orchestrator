@@ -1,4 +1,5 @@
 export * from "./compactor.js";
+export * from "./context-package.js";
 export * from "./segmenter.js";
 export * from "./store.js";
 export * from "./strategies.js";

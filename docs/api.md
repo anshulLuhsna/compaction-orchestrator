@@ -149,6 +149,43 @@ GET /v1/sessions/:sessionId/context
 
 Returns the most recent compacted runtime context view.
 
+## Build Customer Support Context Package
+
+```http
+POST /v1/sessions/:sessionId/context-package
+```
+
+Request:
+
+```json
+{
+  "objective": "Prepare a reliable handoff package for the next support agent.",
+  "desiredBudget": 1600,
+  "policy": {
+    "mode": "balanced",
+    "preserveUserMessagesVerbatim": true,
+    "preserveActiveErrorsVerbatim": false,
+    "allowExternalRetrieval": true
+  }
+}
+```
+
+Response includes:
+
+- `segments`
+- `contextPackage.customer`
+- `contextPackage.issue`
+- `contextPackage.preservedInstructions`
+- `contextPackage.policyConstraints`
+- `contextPackage.troubleshooting`
+- `contextPackage.decisions`
+- `contextPackage.escalation`
+- `contextPackage.nextActions`
+- `contextPackage.runtimeContext`
+- `contextPackage.compactionPlan`
+- `contextPackage.externalReferences`
+- `contextPackage.metrics`
+
 ## List Context Views
 
 ```http

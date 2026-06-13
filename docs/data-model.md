@@ -96,6 +96,52 @@ type RuntimeContextView = {
 };
 ```
 
+## Customer Support Context Package
+
+A domain-specific package generated from the compacted context.
+
+```ts
+type ContextPackage = {
+  id: string;
+  sessionId: string;
+  useCase: "customer_support";
+  objective: string;
+  customer: {
+    name?: string;
+    email?: string;
+    accountId?: string;
+    plan?: string;
+    region?: string;
+  };
+  issue: {
+    summary: string;
+    productArea?: string;
+    severity?: "low" | "medium" | "high" | "critical";
+    status: "open" | "waiting_on_customer" | "waiting_on_internal" | "resolved" | "escalated";
+  };
+  preservedInstructions: string[];
+  policyConstraints: string[];
+  troubleshooting: string[];
+  decisions: string[];
+  escalation: {
+    required: boolean;
+    reason?: string;
+    targetTeam?: string;
+  };
+  nextActions: string[];
+  runtimeContext: RuntimeContextView;
+  compactionPlan: CompactionPlan;
+  externalReferences: string[];
+  metrics: {
+    rawTokenEstimate: number;
+    contextTokenEstimate: number;
+    tokenReduction: number;
+    eventCount: number;
+    segmentCount: number;
+  };
+};
+```
+
 ## Future SQLite Tables
 
 Implemented SQLite tables:

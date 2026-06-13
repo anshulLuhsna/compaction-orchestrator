@@ -24,7 +24,8 @@ This repo contains the first executable API prototype:
 - Segment classification
 - Strategy routing
 - Runtime context view generation
-- In-memory storage
+- SQLite persistence
+- Customer-support context package output
 - Deterministic built-in strategies
 - Smoke test covering mixed strategy selection
 
@@ -38,11 +39,15 @@ This repo contains the first executable API prototype:
 ## Documentation
 
 - [Product brief](./docs/product-brief.md)
+- [Pitch](./docs/pitch.md)
 - [Architecture](./docs/architecture.md)
 - [API reference](./docs/api.md)
+- [Strategy picker data flow](./docs/strategy-picker-data-flow.md)
 - [Strategy plugins](./docs/strategies.md)
 - [Data model](./docs/data-model.md)
 - [Evaluation plan](./docs/evaluation.md)
+- [OpenAI setup](./docs/openai-setup.md)
+- [Customer support demo](./docs/customer-support-demo.md)
 - [Roadmap](./docs/roadmap.md)
 
 ## Run
@@ -67,6 +72,37 @@ DATABASE_URL=data/dev.sqlite npm run dev
 ```
 
 Node currently prints an experimental warning for `node:sqlite`. That is acceptable for this local V0; we can swap to a production SQLite/Postgres driver later behind the same store interface.
+
+## OpenAI Setup
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Then set:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-5.5
+```
+
+Keep `.env` local. It is ignored by git.
+
+With the API running, check configuration:
+
+```bash
+curl -s http://localhost:3000/v1/openai/status
+```
+
+Run a live API smoke test:
+
+```bash
+npm run openai:check
+```
+
+This only verifies OpenAI connectivity. The current compaction picker remains deterministic; the next step is to add an optional OpenAI-powered strategy or planner.
 
 ## API
 
@@ -103,6 +139,18 @@ curl -s http://localhost:3000/v1/sessions/:session_id/compact \
   }'
 ```
 
+### Build a customer-support context package
+
+```bash
+curl -s http://localhost:3000/v1/sessions/:session_id/context-package \
+  -H 'content-type: application/json' \
+  -d '{
+    "objective": "Prepare support handoff",
+    "desiredBudget": 1600,
+    "policy": { "mode": "balanced" }
+  }'
+```
+
 ### Fetch latest context view
 
 ```bash
@@ -119,6 +167,18 @@ curl -s http://localhost:3000/v1/sessions/:session_id/externalized
 
 ```bash
 curl -s http://localhost:3000/v1/sessions/:session_id/externalized/:segment_id
+```
+
+### Check OpenAI configuration
+
+```bash
+curl -s http://localhost:3000/v1/openai/status
+```
+
+### Run OpenAI smoke test
+
+```bash
+curl -s -X POST http://localhost:3000/v1/openai/test
 ```
 
 ## Built-in Strategies
@@ -169,6 +229,48 @@ To verify externalized content retrieval:
 ```bash
 npm run test:persistence
 ```
+
+## Customer Support End-To-End Demo
+
+With the API running:
+
+```bash
+npm run demo:support
+```
+
+This ingests `examples/customer-support-session.json` and returns a structured context package with customer, issue, escalation, next actions, selected compaction strategies, metrics, and external references.
+
+Run the Goldfish-vs-adaptive evaluation:
+
+```bash
+npm run eval:support
+```
+
+Expected result: `adaptive_context_package` wins on recall, especially active support state.
+
+## Web UI
+
+Run the API:
+
+```bash
+DATABASE_URL=data/ui.sqlite npm run start
+```
+
+Run the shadcn-style UI in another terminal:
+
+```bash
+npm run dev:web
+```
+
+Open:
+
+```text
+http://127.0.0.1:5173
+```
+
+Use **Run package** to ingest the customer-support fixture and view the context package. Use **Evaluate** to compare the adaptive package against the Goldfish generic-summary baseline.
+
+Use **Import JSON** in the Input Session panel to load a local `.json` fixture. The imported JSON is copied into the editor, so you can change it before running package or evaluation.
 
 ## Next Recommended Step
 

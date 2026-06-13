@@ -8,6 +8,18 @@ The product should not optimize for shorter context alone. The real goal is pres
 
 Build `Goldfish vs Elephant`.
 
+The first implemented version is the customer-support evaluation in:
+
+```text
+scripts/evaluate-customer-support.mjs
+```
+
+Run it with:
+
+```bash
+npm run eval:support
+```
+
 ### Goldfish
 
 Naive baseline:
@@ -48,7 +60,23 @@ Secondary:
 
 ## First Benchmark Fixture
 
-Use a synthetic coding-agent transcript with:
+Use a synthetic customer-support transcript first:
+
+```text
+examples/customer-support-session.json
+```
+
+It includes:
+
+- Support policy
+- Customer identity
+- Billing issue
+- Tool output
+- Active error state
+- Escalation decision
+- Next action
+
+Later, use a synthetic coding-agent transcript with:
 
 - Several explicit user constraints
 - Repository exploration
@@ -71,3 +99,39 @@ Run both compaction approaches and ask recall questions afterward.
 ## Success Criteria For V0
 
 The adaptive router should beat generic summary on instruction recall, active error recall, and artifact recall while keeping context smaller than the raw transcript.
+
+For the customer-support V0, the adaptive context package should preserve:
+
+- Customer identity
+- Account ID
+- Policy constraints
+- Exact invoice IDs
+- Active support state
+- Escalation reason
+- Next action
+
+## Evaluation Modules To Add
+
+### Goldfish Memory
+
+Compare generic summary against the adaptive context package.
+
+Implemented for customer support.
+
+### Context Ledger
+
+Show what was stored, how it was classified, which strategy was selected, and whether it was later recalled.
+
+### Recall Score
+
+Generate or define hidden questions before compaction, then score what survived after compaction.
+
+Partially implemented through fixture `expectedFacts`.
+
+### Decay Lab
+
+Run repeated compaction cycles and measure which facts disappear after each cycle.
+
+### Handoff Test
+
+Give the context package to a fresh agent and ask it to continue the task.

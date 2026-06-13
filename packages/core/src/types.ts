@@ -35,6 +35,12 @@ export type SemanticType =
   | "artifact_reference"
   | "decision"
   | "completed_exploration"
+  | "customer_profile"
+  | "support_issue"
+  | "support_policy"
+  | "troubleshooting_step"
+  | "escalation_state"
+  | "next_action"
   | "general_context";
 
 export type TaskStage = "setup" | "exploration" | "implementation" | "debugging" | "handoff" | "unknown";
@@ -143,4 +149,45 @@ export type ExternalizedContent = {
   content: string;
   createdAt: string;
   metadata: Record<string, unknown>;
+};
+
+export type ContextPackage = {
+  id: string;
+  sessionId: string;
+  useCase: "customer_support";
+  objective: string;
+  createdAt: string;
+  customer: {
+    name?: string;
+    email?: string;
+    accountId?: string;
+    plan?: string;
+    region?: string;
+  };
+  issue: {
+    summary: string;
+    productArea?: string;
+    severity?: "low" | "medium" | "high" | "critical";
+    status: "open" | "waiting_on_customer" | "waiting_on_internal" | "resolved" | "escalated";
+  };
+  preservedInstructions: string[];
+  policyConstraints: string[];
+  troubleshooting: string[];
+  decisions: string[];
+  escalation: {
+    required: boolean;
+    reason?: string;
+    targetTeam?: string;
+  };
+  nextActions: string[];
+  runtimeContext: RuntimeContextView;
+  compactionPlan: CompactionPlan;
+  externalReferences: string[];
+  metrics: {
+    rawTokenEstimate: number;
+    contextTokenEstimate: number;
+    tokenReduction: number;
+    eventCount: number;
+    segmentCount: number;
+  };
 };
