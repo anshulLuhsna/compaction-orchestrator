@@ -5,9 +5,9 @@ import { cors } from "hono/cors";
 import {
   buildCustomerSupportContextPackage,
   compactSession,
-  sessionEventInputSchema,
-  SqliteStore
+  sessionEventInputSchema
 } from "@compaction-orchestrator/core";
+import { SqliteStore } from "@compaction-orchestrator/core/store";
 import { Hono } from "hono";
 import { z } from "zod";
 import { config as loadDotenv } from "dotenv";
@@ -21,7 +21,13 @@ const app = new Hono();
 const store = new SqliteStore(process.env.DATABASE_URL ?? "data/compaction-orchestrator.sqlite");
 
 app.use("*", cors({
-  origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+  origin(origin) {
+    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+      return origin;
+    }
+
+    return null;
+  },
   allowHeaders: ["content-type"],
   allowMethods: ["GET", "POST", "OPTIONS"]
 }));
@@ -44,6 +50,20 @@ const compactRequestSchema = z.object({
   }).default({})
 });
 
+const compactMessageSchema = z.object({
+  role: z.enum(["user", "assistant", "tool", "system"]),
+  type: z.enum(["message", "tool_call", "tool_output", "decision", "artifact", "compaction"]).optional(),
+  content: z.string().min(1),
+  metadata: z.record(z.unknown()).default({})
+});
+
+const oneShotCompactRequestSchema = compactRequestSchema.extend({
+  messages: z.array(compactMessageSchema).min(1),
+  useCase: z.enum(["generic", "customer_support", "customer-support"]).default("generic"),
+  sessionName: z.string().optional(),
+  metadata: z.record(z.unknown()).default({})
+});
+
 app.get("/health", (context) => {
   return context.json({ ok: true, service: "compaction-orchestrator-api" });
 });
@@ -55,6 +75,73 @@ app.get("/v1/openai/status", (context) => {
     model: config.model
   });
 });
+
+app.post("/v1/compact", async (context) => {
+  const body = await context.req.json().catch(() => undefined);
+  const parsed = oneShotCompactRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return context.json({ error: "Invalid one-shot compaction payload", issues: parsed.error.issues }, 400);
+  }
+
+  const session = store.createSession({
+    name: parsed.data.sessionName ?? "one-shot-compact",
+    metadata: {
+      ...parsed.data.metadata,
+      useCase: parsed.data.useCase,
+      source: "one-shot"
+    }
+  });
+
+  const events = parsed.data.messages.map((message) => store.addEvent(session.id, {
+      role: message.role,
+      type: message.type ?? (message.role === "tool" ? "tool_output" : "message"),
+      content: message.content,
+      metadata: {
+        ...parsed.data.metadata,
+        ...message.metadata,
+        ...(parsed.data.useCase === "customer_support" || parsed.data.useCase === "customer-support" ? { useCase: "customer_support" } : {})
+      }
+    }));
+
+  const isCustomerSupport = parsed.data.useCase === "customer_support" || parsed.data.useCase === "customer-support";
+  const persistedOutput = isCustomerSupport
+    ? packageOutput(buildCustomerSupportContextPackage({
+      sessionId: session.id,
+      events,
+      objective: parsed.data.objective,
+      desiredBudget: parsed.data.desiredBudget,
+      policy: parsed.data.policy
+    }))
+    : compactSession({
+      sessionId: session.id,
+      events,
+      objective: parsed.data.objective,
+      desiredBudget: parsed.data.desiredBudget,
+      policy: parsed.data.policy
+    });
+
+  store.saveCompaction(
+    persistedOutput.plan,
+    persistedOutput.contextView,
+    persistedOutput.segments
+  );
+
+  return context.json({
+    session,
+    sessionId: session.id,
+    ...persistedOutput
+  });
+});
+
+function packageOutput(output: ReturnType<typeof buildCustomerSupportContextPackage>) {
+  return {
+    sessionId: output.contextPackage.sessionId,
+    segments: output.segments,
+    plan: output.contextPackage.compactionPlan,
+    contextView: output.contextPackage.runtimeContext,
+    contextPackage: output.contextPackage
+  };
+}
 
 app.post("/v1/openai/test", async (context) => {
   const config = getOpenAIConfig();

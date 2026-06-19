@@ -1,13 +1,47 @@
 {
   "name": "@compaction-orchestrator/core",
   "version": "0.1.0",
+  "description": "Control which compaction strategy your agent uses for each turn and context segment.",
+  "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "homepage": "https://github.com/anshulLuhsna/compaction-orchestrator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anshulLuhsna/compaction-orchestrator.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/anshulLuhsna/compaction-orchestrator/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "context",
+    "compaction",
+    "memory",
+    "llm",
+    "sdk",
+    "orchestration"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "compaction-orchestrator": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "import": "./dist/store.js"
     }
   },
   "scripts": {
@@ -16,6 +50,9 @@
   },
   "dependencies": {
     "zod": "^3.25.67"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
