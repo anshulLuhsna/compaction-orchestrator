@@ -27,16 +27,16 @@ The result is that long-running agents become less reliable exactly when the wor
 
 ## The Solution
 
-We are building a pluggable Context API for AI agents.
+We are building a pluggable compaction control API for AI agents.
 
-Instead of treating context compaction as one generic summarization step, our system routes each piece of context to the right treatment.
+Instead of treating context compaction as one generic summarization step, our system gives developers control over which strategy the agent uses for each part of the session.
 
 The core idea:
 
 ```text
 raw agent session
 -> classify context
--> choose strategy per segment
+-> choose strategy per segment in the current turn
 -> compact safely
 -> return a smaller runtime context
 ```
@@ -53,7 +53,9 @@ That means the system can decide:
 - Preserve file and artifact state
 - Generate a handoff for a fresh agent later
 
-This turns compaction from a single summary into a programmable context layer.
+The key is that one turn can use multiple strategies at once. The agent is not forced into a single compaction mode.
+
+This turns compaction from a hidden summarization step into a programmable control layer.
 
 ## Simple Explanation
 
@@ -250,13 +252,13 @@ This is not a better summarizer. It is a context router.
 
 ## Short Pitch
 
-We are building a pluggable Context API for AI agents.
+We are building a pluggable compaction control API for AI agents.
 
-As agent sessions get longer, they start forgetting instructions, losing debugging state, repeating work, or hallucinating details. Most systems solve this with one generic summary, but different types of context need different treatment.
+As agent sessions get longer, they start forgetting instructions, losing debugging state, repeating work, or hallucinating details. Most systems solve this with one generic summary or hidden provider compaction, but different types of context need different treatment.
 
-Our system stores the full session, classifies the context, and applies the right compaction strategy to each piece. User instructions stay verbatim, active errors are extracted, old tool logs are masked, large content is externalized, and completed work is summarized.
+Our system stores the full session, classifies the context, and lets the agent apply different compaction strategies in the same turn. User instructions stay verbatim, active errors are extracted, old tool logs are masked, large content is externalized, and completed work is summarized.
 
-The result is smaller context without destroying the information agents need to succeed.
+The result is smaller context with more control over what the agent carries forward.
 
 ## One-Liner
 

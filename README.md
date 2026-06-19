@@ -1,29 +1,110 @@
-# compaction-orchestrator
+# Compaction Orchestrator
 
-A pluggable Context API for applying context-specific and use-case-specific compaction strategies to agent sessions.
+Open-source compaction control for custom AI agents.
 
-Most agent systems compact context with one generic summary. This project treats compaction as a routing problem: each piece of context gets the treatment that fits its type, risk, and use case.
+Most agent systems eventually need to shrink long conversations. The usual answer is one generic summary or a hidden provider-specific compaction step. That is cheap to build, but it gives developers very little control over what survives. It can drop active errors, policy constraints, customer state, tool evidence, or the next action.
+
+Compaction Orchestrator is a control layer for those choices. It lets your agent choose different compaction strategies per turn and per context segment, so each piece of context gets the treatment that fits its type, risk, use case, and latency target.
+
+The first developer experience is an in-process SDK. The API and UI are the proof and orchestration layer.
+
+```ts
+import { compact } from "@compaction-orchestrator/core";
+
+const result = compact({
+  messages,
+  objective: "Prepare the next support-agent handoff.",
+  useCase: "customer_support"
+});
+
+console.log(result.contextView.content);
+console.log(result.contextPackage?.nextActions);
+```
 
 The V0 proves the core shape:
 
 ```text
 raw session events
 → segment classification
-→ strategy routing
+→ strategy routing per segment
 → compaction plan
 → validated runtime context view
 ```
 
 The canonical event log stays intact. Compaction produces a new context view.
 
+One turn can mix strategies:
+
+```text
+user constraint      -> keep_verbatim
+current test failure -> extract_active_error
+large tool output    -> externalize_for_retrieval
+completed research   -> structured_summary
+```
+
+## Try It
+
+Run the zero-server SDK demo:
+
+```bash
+npm install
+npm run test:sdk
+npm run test:cli
+npm run test:api
+npm run demo:sdk
+npm run demo:coding
+npm run demo:cli
+```
+
+The support demo reads `examples/customer-support-session.json` and prints:
+
+- Preserved customer/support state
+- Selected compaction operations
+- Escalation and next action
+- Token reduction metrics
+
+The coding-agent demo reads `examples/coding-agent-session.json` and shows the agent-builder case:
+
+- User constraints stay verbatim
+- Noisy search output is externalized
+- Active typecheck errors are extracted
+- Next action survives as compact runtime context
+
+The CLI demo runs the same coding-agent fixture through the package bin path. After publishing, the intended shape is:
+
+```bash
+npx @compaction-orchestrator/core examples/coding-agent-session.json
+```
+
+Then run the API and UI for the visual demo:
+
+```bash
+npm run dev
+```
+
+Try the one-shot HTTP API with a plain message array:
+
+```bash
+API_URL=http://localhost:3000 npm run test:oneshot
+```
+
+In another terminal:
+
+```bash
+npm run dev:web
+```
+
+Open `http://127.0.0.1:5173`, choose **Support** or **Coding**, then use **Run package** / **Run compact** and **Evaluate**. Support shows the typed handoff package; Coding shows a developer-native runtime context with constraints, active error, strategy plan, and externalized noisy output.
+
 ## Current Status
 
-This repo contains the first executable API prototype:
+This repo contains the first executable prototype:
 
 - Append-only session event ingestion
 - Segment classification
-- Strategy routing
+- Per-turn, per-segment strategy routing
 - Runtime context view generation
+- In-process SDK helper
 - SQLite persistence
 - Customer-support context package output
 - Deterministic built-in strategies
@@ -38,19 +119,23 @@ This repo contains the first executable API prototype:
 
 ## Documentation
 
+- [SDK quickstart](./docs/sdk.md)
+- [CLI quickstart](./docs/cli.md)
 - [Product brief](./docs/product-brief.md)
 - [Pitch](./docs/pitch.md)
 - [Architecture](./docs/architecture.md)
 - [API reference](./docs/api.md)
+- [OpenAPI contract](./docs/openapi.yaml)
 - [Strategy picker data flow](./docs/strategy-picker-data-flow.md)
 - [Strategy plugins](./docs/strategies.md)
 - [Data model](./docs/data-model.md)
 - [Evaluation plan](./docs/evaluation.md)
 - [OpenAI setup](./docs/openai-setup.md)
 - [Customer support demo](./docs/customer-support-demo.md)
+- [Launch demo guide](./docs/launch-demo.md)
 - [Roadmap](./docs/roadmap.md)
 
-## Run
+## Run the API
 
 ```bash
 npm install
@@ -102,7 +187,44 @@ Run a live API smoke test:
 npm run openai:check
 ```
 
-This only verifies OpenAI connectivity. The current compaction picker remains deterministic; the next step is to add an optional OpenAI-powered strategy or planner.
+This only verifies OpenAI connectivity. The current strategy picker remains deterministic; the next step is to add an optional OpenAI-powered strategy or planner behind the same control layer.
+
+## SDK
+
+### Compact plain messages
+
+```ts
+import { compact } from "@compaction-orchestrator/core";
+
+const result = compact({
+  messages: [
+    {
+      role: "system",
+      content: "Support policy: do not promise refunds above $5,000 without Billing Ops approval."
+    },
+    {
+      role: "user",
+      content: "Customer Maya Chen was double charged and cannot open the billing page."
+    },
+    {
+      role: "tool",
+      content: "Error: billing_portal_v2=false for account ACME-ENT-4481. Owner receives 403."
+    }
+  ],
+  objective: "Prepare support handoff",
+  useCase: "customer_support"
+});
+
+console.log(result.contextView.content);
+```
+
+Use `compact()` when you want a function call inside your agent loop. Use the HTTP API when you want persisted sessions, UI inspection, or sidecar orchestration.
+
+The package root stays SDK-only. Import persistence explicitly when you need it:
+
+```ts
+import { SqliteStore } from "@compaction-orchestrator/core/store";
+```
 
 ## API
 
@@ -248,6 +370,16 @@ npm run eval:support
 
 Expected result: `adaptive_context_package` wins on recall, especially active support state.
 
+## Coding-Agent SDK Demo
+
+Run the developer-native fixture without starting the API server:
+
+```bash
+npm run demo:coding
+```
+
+This compacts `examples/coding-agent-session.json` and verifies that the SDK preserves framework constraints, response shape, route path, active typecheck failure, and next action while externalizing noisy search output.
+
 ## Web UI
 
 Run the API:
@@ -268,7 +400,7 @@ Open:
 http://127.0.0.1:5173
 ```
 
-Use **Run package** to ingest the customer-support fixture and view the context package. Use **Evaluate** to compare the adaptive package against the Goldfish generic-summary baseline.
+Use **Support** for the customer-support handoff package demo. Use **Coding** for the agent-builder demo that preserves framework constraints, active typecheck failure, route shape, and next action. **Evaluate** compares the adaptive output against the Goldfish generic-summary baseline for the selected fixture.
 
 Use **Import JSON** in the Input Session panel to load a local `.json` fixture. The imported JSON is copied into the editor, so you can change it before running package or evaluation.
 

@@ -2,11 +2,11 @@
 
 ## What We Are Building
 
-`compaction-orchestrator` is a pluggable Context API for AI agents and AI applications.
+`compaction-orchestrator` is a pluggable compaction control API for AI agents and AI applications.
 
 It receives raw session events, preserves the canonical history, classifies the context into meaningful segments, and applies different compaction strategies depending on the segment type, use case, policy, and risk.
 
-The product is not a summarizer. It is a context routing layer.
+The product is not another compaction tool or summarizer. It is a control layer for deciding which compaction strategy an agent should use.
 
 ## Core Thesis
 
@@ -21,6 +21,8 @@ The system should decide whether each segment should be:
 - Externalized for retrieval
 - Turned into a handoff
 - Sent to a provider-native compaction mechanism
+
+A single agent turn can use multiple strategies at once. For example, one turn might keep a user instruction verbatim, extract an active error, externalize a large log, and summarize completed exploration.
 
 ## Primary User
 
@@ -49,4 +51,4 @@ The first demo should show that an adaptive compaction router preserves importan
 
 ## Product Promise
 
-Compaction without losing the things that make the agent succeed.
+More control over what your agent keeps, shrinks, externalizes, and carries into the next turn.

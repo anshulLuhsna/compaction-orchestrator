@@ -1,0 +1,796 @@
+openapi: 3.1.0
+info:
+  title: Compaction Orchestrator API
+  version: 0.1.0
+  description: >
+    HTTP API for controlling how an agent session is compacted. The API stores
+    the canonical event log, classifies context, chooses compaction strategies
+    per segment, and returns a compact runtime context view.
+servers:
+  - url: http://localhost:3000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: API is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  service:
+                    type: string
+                required: [ok, service]
+  /v1/compact:
+    post:
+      summary: One-shot compaction
+      description: >
+        Creates a persisted session from plain messages, runs the strategy picker,
+        saves the compaction plan and runtime context view, and returns the output.
+        Use this for quick integration tests or demos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OneShotCompactRequest"
+            examples:
+              coding:
+                value:
+                  sessionName: coding-agent-router-debug-demo
+                  useCase: generic
+                  objective: Prepare compact context for the next coding-agent turn.
+                  desiredBudget: 1200
+                  policy:
+                    mode: balanced
+                    preserveUserMessagesVerbatim: true
+                    allowExternalRetrieval: true
+                  messages:
+                    - role: user
+                      content: Use Hono only. Do not add Express.
+                      metadata:
+                        artifacts:
+                          - apps/api/src/index.ts
+                    - role: tool
+                      type: tool_output
+                      content: "npm run typecheck failed: Cannot find module './billing-store.js'"
+      responses:
+        "200":
+          description: Compaction result.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      session:
+                        $ref: "#/components/schemas/Session"
+                      sessionId:
+                        type: string
+                    required: [session, sessionId]
+                  - $ref: "#/components/schemas/CompactionOutput"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/sessions:
+    post:
+      summary: Create session
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Created session.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: "#/components/schemas/Session"
+                required: [session]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    get:
+      summary: List sessions
+      responses:
+        "200":
+          description: Sessions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Session"
+                required: [sessions]
+  /v1/sessions/{sessionId}:
+    get:
+      summary: Get session
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Session.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: "#/components/schemas/Session"
+                required: [session]
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/events:
+    post:
+      summary: Append event
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionEventInput"
+      responses:
+        "201":
+          description: Created event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    $ref: "#/components/schemas/SessionEvent"
+                required: [event]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      summary: List events
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionEvent"
+                required: [events]
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/compact:
+    post:
+      summary: Compact a persisted session
+      description: >
+        Runs segment classification and chooses a strategy per segment for the
+        next runtime context view.
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompactRequest"
+      responses:
+        "200":
+          description: Compaction output.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompactionOutput"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/context-package:
+    post:
+      summary: Build customer-support context package
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompactRequest"
+      responses:
+        "200":
+          description: Customer-support context package.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  segments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ContextSegment"
+                  contextPackage:
+                    $ref: "#/components/schemas/ContextPackage"
+                required: [segments, contextPackage]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/context:
+    get:
+      summary: Get latest runtime context view
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Latest context view.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contextView:
+                    $ref: "#/components/schemas/RuntimeContextView"
+                required: [contextView]
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/context-views:
+    get:
+      summary: List runtime context views
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Context views.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contextViews:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RuntimeContextView"
+                required: [contextViews]
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/externalized:
+    get:
+      summary: List externalized content metadata
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Externalized content metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  externalized:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ExternalizedContentMetadata"
+                required: [externalized]
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/externalized/{segmentId}:
+    get:
+      summary: Fetch externalized content
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - name: segmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Externalized content.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  externalized:
+                    $ref: "#/components/schemas/ExternalizedContent"
+                required: [externalized]
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/openai/status:
+    get:
+      summary: Check OpenAI configuration
+      responses:
+        "200":
+          description: OpenAI configuration status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  model:
+                    type: string
+                required: [configured, model]
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request payload.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    CreateSessionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+    OneShotCompactRequest:
+      allOf:
+        - $ref: "#/components/schemas/CompactRequest"
+        - type: object
+          properties:
+            messages:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/CompactMessage"
+            useCase:
+              type: string
+              enum: [generic, customer_support, customer-support]
+              default: generic
+            sessionName:
+              type: string
+            metadata:
+              type: object
+              additionalProperties: true
+              default: {}
+          required: [messages]
+    CompactRequest:
+      type: object
+      properties:
+        objective:
+          type: string
+          minLength: 1
+        desiredBudget:
+          type: integer
+          minimum: 1
+        policy:
+          $ref: "#/components/schemas/CompactionPolicy"
+      required: [objective]
+    CompactMessage:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/EventRole"
+        type:
+          $ref: "#/components/schemas/EventType"
+        content:
+          type: string
+          minLength: 1
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+      required: [role, content]
+    SessionEventInput:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/EventRole"
+        type:
+          $ref: "#/components/schemas/EventType"
+        content:
+          type: string
+          minLength: 1
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+      required: [role, type, content]
+    EventRole:
+      type: string
+      enum: [user, assistant, tool, system]
+    EventType:
+      type: string
+      enum: [message, tool_call, tool_output, decision, artifact, compaction]
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [id, createdAt, metadata]
+    SessionEvent:
+      allOf:
+        - $ref: "#/components/schemas/SessionEventInput"
+        - type: object
+          properties:
+            id:
+              type: string
+            sessionId:
+              type: string
+            createdAt:
+              type: string
+            sequence:
+              type: integer
+          required: [id, sessionId, createdAt, sequence]
+    CompactionPolicy:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [accuracy_first, balanced, cost_first, long_horizon, human_controlled]
+        preserveUserMessagesVerbatim:
+          type: boolean
+        preserveActiveErrorsVerbatim:
+          type: boolean
+        allowExternalRetrieval:
+          type: boolean
+        allowHandoff:
+          type: boolean
+        requireApprovalForHighRiskChanges:
+          type: boolean
+      additionalProperties: false
+      default: {}
+    CompactionOutput:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextSegment"
+        plan:
+          $ref: "#/components/schemas/CompactionPlan"
+        contextView:
+          $ref: "#/components/schemas/RuntimeContextView"
+        contextPackage:
+          $ref: "#/components/schemas/ContextPackage"
+      required: [sessionId, segments, plan, contextView]
+    ContextSegment:
+      type: object
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        sessionId:
+          type: string
+        content:
+          type: string
+        contentType:
+          $ref: "#/components/schemas/EventType"
+        semanticType:
+          type: string
+        taskStage:
+          type: string
+        status:
+          type: string
+        artifacts:
+          type: array
+          items:
+            type: string
+        importance:
+          type: number
+        futureRelevance:
+          type: number
+        exactnessRequired:
+          type: boolean
+        retrievable:
+          type: boolean
+        reconstructionCost:
+          type: string
+          enum: [low, medium, high]
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - id
+        - eventId
+        - sessionId
+        - content
+        - contentType
+        - semanticType
+        - taskStage
+        - status
+        - artifacts
+        - importance
+        - futureRelevance
+        - exactnessRequired
+        - retrievable
+        - reconstructionCost
+        - metadata
+    CompactionPlan:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        objective:
+          type: string
+        createdAt:
+          type: string
+        policy:
+          $ref: "#/components/schemas/CompactionPolicy"
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SegmentPlan"
+        warnings:
+          type: array
+          items:
+            type: string
+      required: [id, sessionId, objective, createdAt, policy, segments, warnings]
+    SegmentPlan:
+      type: object
+      properties:
+        segmentId:
+          type: string
+        eventId:
+          type: string
+        semanticType:
+          type: string
+        operation:
+          type: string
+        reason:
+          type: string
+        requiresHumanApproval:
+          type: boolean
+        estimate:
+          $ref: "#/components/schemas/StrategyEstimate"
+        result:
+          $ref: "#/components/schemas/StrategyExecution"
+        validation:
+          $ref: "#/components/schemas/StrategyValidation"
+      required:
+        - segmentId
+        - eventId
+        - semanticType
+        - operation
+        - reason
+        - requiresHumanApproval
+        - estimate
+        - result
+        - validation
+    StrategyEstimate:
+      type: object
+      properties:
+        tokenSavings:
+          type: integer
+        preservationRisk:
+          type: string
+          enum: [low, medium, high]
+        latency:
+          type: string
+          enum: [low, medium, high]
+        confidence:
+          type: number
+      required: [tokenSavings, preservationRisk, latency, confidence]
+    StrategyExecution:
+      type: object
+      properties:
+        content:
+          type: string
+        externalReference:
+          type: string
+        provenance:
+          type: array
+          items:
+            type: string
+        tokenEstimate:
+          type: integer
+      required: [content, provenance, tokenEstimate]
+    StrategyValidation:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        checks:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+      required: [passed, checks, warnings]
+    RuntimeContextView:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        planId:
+          type: string
+        createdAt:
+          type: string
+        content:
+          type: string
+        tokenEstimate:
+          type: integer
+        externalReferences:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+      required: [id, sessionId, planId, createdAt, content, tokenEstimate, externalReferences, warnings]
+    ContextPackage:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        useCase:
+          type: string
+          enum: [customer_support]
+        objective:
+          type: string
+        createdAt:
+          type: string
+        customer:
+          type: object
+          additionalProperties: true
+        issue:
+          type: object
+          additionalProperties: true
+        preservedInstructions:
+          type: array
+          items:
+            type: string
+        policyConstraints:
+          type: array
+          items:
+            type: string
+        troubleshooting:
+          type: array
+          items:
+            type: string
+        decisions:
+          type: array
+          items:
+            type: string
+        escalation:
+          type: object
+          additionalProperties: true
+        nextActions:
+          type: array
+          items:
+            type: string
+        runtimeContext:
+          $ref: "#/components/schemas/RuntimeContextView"
+        compactionPlan:
+          $ref: "#/components/schemas/CompactionPlan"
+        externalReferences:
+          type: array
+          items:
+            type: string
+        metrics:
+          type: object
+          properties:
+            rawTokenEstimate:
+              type: integer
+            contextTokenEstimate:
+              type: integer
+            tokenReduction:
+              type: integer
+            eventCount:
+              type: integer
+            segmentCount:
+              type: integer
+          required: [rawTokenEstimate, contextTokenEstimate, tokenReduction, eventCount, segmentCount]
+      required:
+        - id
+        - sessionId
+        - useCase
+        - objective
+        - createdAt
+        - customer
+        - issue
+        - preservedInstructions
+        - policyConstraints
+        - troubleshooting
+        - decisions
+        - escalation
+        - nextActions
+        - runtimeContext
+        - compactionPlan
+        - externalReferences
+        - metrics
+    ExternalizedContentMetadata:
+      type: object
+      properties:
+        reference:
+          type: string
+        segmentId:
+          type: string
+        eventId:
+          type: string
+        semanticType:
+          type: string
+        createdAt:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        contentLength:
+          type: integer
+      required: [reference, segmentId, eventId, semanticType, createdAt, metadata, contentLength]
+    ExternalizedContent:
+      type: object
+      properties:
+        reference:
+          type: string
+        sessionId:
+          type: string
+        segmentId:
+          type: string
+        eventId:
+          type: string
+        semanticType:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [reference, sessionId, segmentId, eventId, semanticType, content, createdAt, metadata]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [error]

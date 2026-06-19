@@ -6,6 +6,10 @@ Base URL:
 http://localhost:3000
 ```
 
+The API is the sidecar version of the compaction control layer. Use it when you want persisted sessions, replayable compaction plans, UI inspection, or context coordination across processes.
+
+Every compaction response includes a `plan`. That plan records which strategy was chosen for each context segment in the turn.
+
 ## Health
 
 ```http
@@ -104,6 +108,52 @@ Allowed event types:
 GET /v1/sessions/:sessionId/events
 ```
 
+## One-Shot Compact
+
+```http
+POST /v1/compact
+```
+
+Use this when you want to try the API with one request instead of creating a session and appending events manually. The API creates a persisted session behind the scenes, stores the generated context view, and returns the session ID so you can inspect `/context` or `/externalized` afterward.
+
+Request:
+
+```json
+{
+  "sessionName": "coding-agent-router-debug-demo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Use Hono only. Do not add Express.",
+      "metadata": {
+        "artifacts": ["apps/api/src/index.ts"]
+      }
+    },
+    {
+      "role": "tool",
+      "content": "npm run typecheck failed: Cannot find module './billing-store.js'"
+    }
+  ],
+  "objective": "Prepare compact context for the next coding-agent turn.",
+  "desiredBudget": 1200,
+  "policy": {
+    "mode": "balanced",
+    "preserveActiveErrorsVerbatim": false
+  }
+}
+```
+
+Set `"useCase": "customer_support"` to return a customer-support `contextPackage` in the same response.
+
+Response includes:
+
+- `session`: persisted session created for the request
+- `sessionId`
+- `segments`
+- `plan`: the per-segment compaction choices for this turn
+- `contextView`
+- `contextPackage` when `useCase` is `customer_support`
+
 ## Compact Session
 
 ```http
@@ -138,8 +188,10 @@ Policy modes:
 Response includes:
 
 - `segments`: classified context segments
-- `plan`: strategy decisions and validation output
+- `plan`: strategy decisions and validation output for each segment in the turn
 - `contextView`: compacted runtime context
+
+The same session can produce different plans when you change the objective, desired budget, or policy.
 
 ## Get Latest Context View
 

@@ -4,6 +4,8 @@
 
 A strategy is a pluggable compaction operation. The router asks each strategy whether it supports a segment, estimates the tradeoff, chooses one, executes it, and validates the result.
 
+The main product promise is control. A single compaction run can choose different strategies for different segments in the same turn.
+
 ## Interface
 
 Current interface in `packages/core/src/types.ts`:
@@ -80,6 +82,8 @@ The current router is intentionally simple:
 - User instructions are kept verbatim
 - Active errors can be extracted when `preserveActiveErrorsVerbatim` is `false`
 - Otherwise, the first supported strategy wins
+
+Even with this simple V0 router, the output is a mixed strategy plan. That plan is inspectable and persistable, so users can understand and eventually override how their agent compacts context.
 
 ## How To Add A Strategy
 
