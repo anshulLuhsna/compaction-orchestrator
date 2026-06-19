@@ -102,3 +102,66 @@ export const supportFixture = {
     { id: "next_action", category: "next_action", requiredTerms: ["no refund", "same-day update", "5 PM UTC"] }
   ]
 } as const;
+
+export const codingFixture = {
+  name: "coding-agent-router-debug-demo",
+  objective: "Prepare compact context for the next coding-agent turn while preserving active build failure, user constraints, and the implementation decision.",
+  desiredBudget: 1200,
+  policy: {
+    mode: "balanced",
+    preserveUserMessagesVerbatim: true,
+    preserveActiveErrorsVerbatim: false,
+    allowExternalRetrieval: true
+  },
+  events: [
+    {
+      role: "user",
+      type: "message",
+      content: "Implement the billing router in apps/api/src/billing-router.ts. Use Hono only. Do not add Express. Keep the public response shape exactly { ok, invoiceId, status }. Add the route under /v1/billing/:invoiceId.",
+      metadata: { artifacts: ["apps/api/src/billing-router.ts"] }
+    },
+    {
+      role: "assistant",
+      type: "message",
+      content: "I inspected apps/api/src/index.ts and packages/core/src/store.ts. The API already uses Hono and centralizes route registration in apps/api/src/index.ts. There is no Express dependency.",
+      metadata: { artifacts: ["apps/api/src/index.ts", "packages/core/src/store.ts"] }
+    },
+    {
+      role: "tool",
+      type: "tool_output",
+      content: "rg billing apps packages\napps/api/src/index.ts: app.get('/v1/sessions/:sessionId/context', ...)\napps/api/src/openai.ts: export function getOpenAIConfig()\npackages/core/src/context-package.ts: productArea: 'Billing'\nNo billing router exists yet.\nAdditional low-value search output:\nline 001 repeated unrelated context\nline 002 repeated unrelated context\nline 003 repeated unrelated context\nline 004 repeated unrelated context\nline 005 repeated unrelated context\nline 006 repeated unrelated context\nline 007 repeated unrelated context\nline 008 repeated unrelated context\nline 009 repeated unrelated context\nline 010 repeated unrelated context\nline 011 repeated unrelated context\nline 012 repeated unrelated context\nline 013 repeated unrelated context\nline 014 repeated unrelated context\nline 015 repeated unrelated context\nline 016 repeated unrelated context\nline 017 repeated unrelated context\nline 018 repeated unrelated context\nline 019 repeated unrelated context\nline 020 repeated unrelated context\nline 021 repeated unrelated context\nline 022 repeated unrelated context\nline 023 repeated unrelated context\nline 024 repeated unrelated context\nline 025 repeated unrelated context\nline 026 repeated unrelated context\nline 027 repeated unrelated context\nline 028 repeated unrelated context\nline 029 repeated unrelated context\nline 030 repeated unrelated context",
+      metadata: {
+        command: "rg billing apps packages",
+        artifacts: ["apps/api/src/index.ts", "packages/core/src/context-package.ts"]
+      }
+    },
+    {
+      role: "assistant",
+      type: "decision",
+      content: "Decision: create a small Hono router module and mount it from apps/api/src/index.ts instead of putting billing logic inline. Preserve the response shape { ok, invoiceId, status } and keep invoice status deterministic for the demo.",
+      metadata: { artifacts: ["apps/api/src/billing-router.ts", "apps/api/src/index.ts"] }
+    },
+    {
+      role: "tool",
+      type: "tool_output",
+      content: "npm run typecheck failed\n\napps/api/src/billing-router.ts:2:22 - error TS2307: Cannot find module './billing-store.js' or its corresponding type declarations.\n\n2 import { lookupInvoice } from './billing-store.js';\n                       ~~~~~~~~~~~~~~~~~~~~\n\napps/api/src/index.ts:17:10 - error TS2305: Module './billing-router.js' has no exported member 'billingRouter'.\n\n17 import { billingRouter } from './billing-router.js';\n            ~~~~~~~~~~~~~\n\nNeed to either add apps/api/src/billing-store.ts or inline the lookup in billing-router.ts, and export billingRouter by name.",
+      metadata: {
+        command: "npm run typecheck",
+        artifacts: ["apps/api/src/billing-router.ts", "apps/api/src/index.ts"]
+      }
+    },
+    {
+      role: "assistant",
+      type: "message",
+      content: "Next action: fix the missing billing-store import by keeping the invoice lookup local to billing-router.ts, export const billingRouter, then rerun npm run typecheck and npm run test:smoke.",
+      metadata: { artifacts: ["apps/api/src/billing-router.ts"] }
+    }
+  ],
+  expectedFacts: [
+    { id: "framework_constraint", category: "instruction", requiredTerms: ["Use Hono only", "Do not add Express"] },
+    { id: "response_shape", category: "exact_fact", requiredTerms: ["{ ok, invoiceId, status }"] },
+    { id: "route_path", category: "exact_fact", requiredTerms: ["/v1/billing/:invoiceId"] },
+    { id: "active_error", category: "active_state", requiredTerms: ["Cannot find module './billing-store.js'", "no exported member 'billingRouter'"] },
+    { id: "next_action", category: "next_action", requiredTerms: ["export const billingRouter", "npm run typecheck", "npm run test:smoke"] }
+  ]
+} as const;

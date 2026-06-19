@@ -10,10 +10,11 @@ import {
   RefreshCw,
   Server,
   ShieldCheck,
+  TerminalSquare,
   Upload
 } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Tabs, Textarea } from "./components/ui";
-import { supportFixture } from "./fixture";
+import { codingFixture, supportFixture } from "./fixture";
 
 type JsonRecord = Record<string, any>;
 
@@ -26,7 +27,7 @@ export function App() {
   const [inputName, setInputName] = useState("Built-in customer support fixture");
   const [activeTab, setActiveTab] = useState("Package");
   const [status, setStatus] = useState<JsonRecord | null>(null);
-  const [contextPackage, setContextPackage] = useState<JsonRecord | null>(null);
+  const [output, setOutput] = useState<JsonRecord | null>(null);
   const [events, setEvents] = useState<JsonRecord[]>([]);
   const [externalized, setExternalized] = useState<JsonRecord[]>([]);
   const [evaluation, setEvaluation] = useState<JsonRecord | null>(null);
@@ -78,7 +79,7 @@ export function App() {
       const parsed = JSON.parse(text);
       setFixtureText(JSON.stringify(parsed, null, 2));
       setInputName(file.name);
-      setContextPackage(null);
+      clearOutput();
       setEvents([]);
       setExternalized([]);
       setEvaluation(null);
@@ -103,12 +104,13 @@ export function App() {
     setError(null);
     setEvaluation(null);
     try {
-      addLog("Creating customer-support session.");
+      const useCase = fixtureUseCase(parsedFixture);
+      addLog(`Creating ${useCase} session.`);
       const session = await request("/v1/sessions", {
         method: "POST",
         body: JSON.stringify({
           name: parsedFixture.name,
-          metadata: { useCase: "customer_support", source: "web-ui" }
+          metadata: { useCase, source: "web-ui" }
         })
       });
 
@@ -120,7 +122,8 @@ export function App() {
       }
       addLog(`Ingested ${parsedFixture.events.length} events.`);
 
-      const packaged = await request(`/v1/sessions/${session.session.id}/context-package`, {
+      const endpoint = useCase === "customer_support" ? "context-package" : "compact";
+      const result = await request(`/v1/sessions/${session.session.id}/${endpoint}`, {
         method: "POST",
         body: JSON.stringify({
           objective: parsedFixture.objective,
@@ -131,11 +134,11 @@ export function App() {
 
       const eventList = await request(`/v1/sessions/${session.session.id}/events`);
       const externalizedList = await request(`/v1/sessions/${session.session.id}/externalized`);
-      setContextPackage(packaged.contextPackage);
+      setOutput(normalizeRunOutput(result, session.session.id, parsedFixture));
       setEvents(eventList.events);
       setExternalized(externalizedList.externalized);
       setActiveTab("Package");
-      addLog(`Built context package ${packaged.contextPackage.id}.`);
+      addLog(useCase === "customer_support" ? `Built context package ${result.contextPackage.id}.` : `Built runtime context ${result.contextView.id}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -152,18 +155,8 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const adaptive = contextPackage ?? await createPackageForEvaluation(parsedFixture);
-      const adaptiveText = [
-        JSON.stringify(adaptive.customer),
-        JSON.stringify(adaptive.issue),
-        adaptive.preservedInstructions?.join("\n"),
-        adaptive.policyConstraints?.join("\n"),
-        adaptive.troubleshooting?.join("\n"),
-        adaptive.decisions?.join("\n"),
-        JSON.stringify(adaptive.escalation),
-        adaptive.nextActions?.join("\n"),
-        adaptive.runtimeContext?.content
-      ].join("\n\n");
+      const adaptive = output ?? await createOutputForEvaluation(parsedFixture);
+      const adaptiveText = adaptiveTextFor(adaptive);
       const goldfishText = buildGoldfishSummary(parsedFixture);
 
       const result = {
@@ -181,12 +174,13 @@ export function App() {
     }
   }
 
-  async function createPackageForEvaluation(fixture: JsonRecord) {
+  async function createOutputForEvaluation(fixture: JsonRecord) {
+    const useCase = fixtureUseCase(fixture);
     const session = await request("/v1/sessions", {
       method: "POST",
       body: JSON.stringify({
         name: `${fixture.name}-web-eval`,
-        metadata: { useCase: "customer_support", source: "web-ui-eval" }
+        metadata: { useCase, source: "web-ui-eval" }
       })
     });
 
@@ -197,7 +191,8 @@ export function App() {
       });
     }
 
-    const packaged = await request(`/v1/sessions/${session.session.id}/context-package`, {
+    const endpoint = useCase === "customer_support" ? "context-package" : "compact";
+    const result = await request(`/v1/sessions/${session.session.id}/${endpoint}`, {
       method: "POST",
       body: JSON.stringify({
         objective: fixture.objective,
@@ -205,15 +200,32 @@ export function App() {
         policy: fixture.policy
       })
     });
-    return packaged.contextPackage;
+    return normalizeRunOutput(result, session.session.id, fixture);
   }
 
   function addLog(message: string) {
     setLog((items) => [`${new Date().toLocaleTimeString()} ${message}`, ...items].slice(0, 8));
   }
 
-  const operations = contextPackage?.compactionPlan?.segments?.map((segment: JsonRecord) => segment.operation) ?? [];
-  const metrics = contextPackage?.metrics;
+  function loadBuiltInFixture(kind: "support" | "coding") {
+    const fixture = kind === "support" ? supportFixture : codingFixture;
+    setFixtureText(JSON.stringify(fixture, null, 2));
+    setInputName(kind === "support" ? "Built-in customer support fixture" : "Built-in coding-agent fixture");
+    clearOutput();
+    setActiveTab("Package");
+    addLog(`Loaded ${kind === "support" ? "customer-support" : "coding-agent"} fixture.`);
+  }
+
+  function clearOutput() {
+    setOutput(null);
+    setEvents([]);
+    setExternalized([]);
+    setEvaluation(null);
+  }
+
+  const operations = output?.plan?.segments?.map((segment: JsonRecord) => segment.operation) ?? [];
+  const metrics = output?.metrics;
+  const useCase = parsedFixture ? fixtureUseCase(parsedFixture) : "unknown";
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -225,7 +237,7 @@ export function App() {
               <h1 className="text-2xl font-semibold">Compaction Orchestrator</h1>
             </div>
             <p className="mt-1 text-sm text-zinc-500">
-              Customer-support session ingestion, adaptive context package output, and Goldfish recall comparison.
+              Control which compaction strategies your agent chooses per turn and context segment.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[minmax(240px,340px)_auto_auto_auto]">
@@ -236,7 +248,7 @@ export function App() {
             </Button>
             <Button onClick={runSupportPackage} disabled={loading || !parsedFixture}>
               {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Run package
+              {useCase === "customer_support" ? "Run package" : "Run compact"}
             </Button>
             <Button variant="secondary" onClick={runEvaluation} disabled={loading || !parsedFixture}>
               <Gauge className="h-4 w-4" />
@@ -253,11 +265,20 @@ export function App() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <CardTitle>Input Session</CardTitle>
-                  <CardDescription>Import a JSON session, edit it here, then ingest it through the API.</CardDescription>
+                  <CardDescription>Choose a demo or import JSON, then inspect the per-segment strategy choices.</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge>{inputName}</Badge>
+                  <Badge>{useCase}</Badge>
                   <Badge>{parsedFixture ? `${parsedFixture.events?.length ?? 0} events` : "Invalid JSON"}</Badge>
+                  <Button variant="secondary" size="sm" onClick={() => loadBuiltInFixture("support")}>
+                    <PackageCheck className="h-4 w-4" />
+                    Support
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => loadBuiltInFixture("coding")}>
+                    <TerminalSquare className="h-4 w-4" />
+                    Coding
+                  </Button>
                   <input
                     ref={fileInputRef}
                     className="hidden"
@@ -280,7 +301,7 @@ export function App() {
               />
               <div className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
                 <StatusPill icon={<Database className="h-3.5 w-3.5" />} label="SQLite canonical log" />
-                <StatusPill icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Policy-aware picker" />
+                <StatusPill icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Per-turn strategy control" />
               </div>
             </CardContent>
           </Card>
@@ -297,14 +318,14 @@ export function App() {
               <CardHeader className="flex flex-row items-center justify-between gap-3">
                 <div>
                   <CardTitle>Output</CardTitle>
-                  <CardDescription>Inspect the generated package, runtime context, strategy plan, and eval.</CardDescription>
+                  <CardDescription>Inspect output, runtime context, strategy choices, and eval.</CardDescription>
                 </div>
                 <Tabs tabs={["Package", "Runtime", "Plan", "Evaluation", "Events", "Logs"]} value={activeTab} onChange={setActiveTab} />
               </CardHeader>
               <CardContent>
-                {activeTab === "Package" && <PackageView contextPackage={contextPackage} operations={operations} />}
-                {activeTab === "Runtime" && <CodeBlock value={contextPackage?.runtimeContext?.content ?? "Run package to see compacted runtime context."} />}
-                {activeTab === "Plan" && <CodeBlock value={contextPackage ? JSON.stringify(contextPackage.compactionPlan, null, 2) : "Run package to see the compaction plan."} />}
+                {activeTab === "Package" && <PackageView output={output} operations={operations} />}
+                {activeTab === "Runtime" && <CodeBlock value={output?.runtimeContext?.content ?? "Run package/compact to see compacted runtime context."} />}
+                {activeTab === "Plan" && <CodeBlock value={output ? JSON.stringify(output.plan, null, 2) : "Run package/compact to see the compaction plan."} />}
                 {activeTab === "Evaluation" && <EvaluationView evaluation={evaluation} />}
                 {activeTab === "Events" && <CodeBlock value={events.length ? JSON.stringify(events, null, 2) : "Run package to see persisted events."} />}
                 {activeTab === "Logs" && <LogView status={status} log={log} />}
@@ -332,11 +353,33 @@ function StatusPill({ icon, label }: { icon: React.ReactNode; label: string }) {
   return <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-2">{icon}{label}</div>;
 }
 
-function PackageView({ contextPackage, operations }: { contextPackage: JsonRecord | null; operations: string[] }) {
-  if (!contextPackage) {
-    return <EmptyState title="No context package yet" detail="Run package to create a session, ingest events, and generate output." />;
+function PackageView({ output, operations }: { output: JsonRecord | null; operations: string[] }) {
+  if (!output) {
+    return <EmptyState title="No output yet" detail="Run package or compact to create a session, ingest events, and generate output." />;
   }
 
+  if (output.kind === "generic") {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <InfoBlock title="Runtime context" rows={{
+          sessionId: output.sessionId,
+          contextViewId: output.runtimeContext.id,
+          tokenEstimate: output.runtimeContext.tokenEstimate,
+          warnings: output.runtimeContext.warnings?.length ?? 0
+        }} />
+        <div className="rounded-md border border-zinc-200 p-3">
+          <div className="mb-2 text-sm font-semibold">Strategies</div>
+          <div className="flex flex-wrap gap-2">
+            {operations.map((operation, index) => <Badge key={`${operation}-${index}`}>{operation}</Badge>)}
+          </div>
+        </div>
+        <ListBlock title="Preserved facts" items={output.factIds} />
+        <ListBlock title="External references" items={output.runtimeContext.externalReferences} />
+      </div>
+    );
+  }
+
+  const contextPackage = output.contextPackage;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <InfoBlock title="Customer" rows={contextPackage.customer} />
@@ -474,6 +517,64 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
   );
 }
 
+function normalizeRunOutput(result: JsonRecord, sessionId: string, fixture: JsonRecord): JsonRecord {
+  if (result.contextPackage) {
+    return {
+      kind: "customer_support",
+      sessionId,
+      contextPackage: result.contextPackage,
+      runtimeContext: result.contextPackage.runtimeContext,
+      plan: result.contextPackage.compactionPlan,
+      metrics: result.contextPackage.metrics,
+      factIds: (fixture.expectedFacts ?? []).map((fact: JsonRecord) => fact.id)
+    };
+  }
+
+  const rawTokenEstimate = estimateTokens(fixture.events?.map((event: JsonRecord) => event.content).join("\n\n") ?? "");
+  const contextTokenEstimate = result.contextView?.tokenEstimate ?? 0;
+  return {
+    kind: "generic",
+    sessionId,
+    runtimeContext: result.contextView,
+    plan: result.plan,
+    segments: result.segments,
+    metrics: {
+      rawTokenEstimate,
+      contextTokenEstimate,
+      tokenReduction: Math.max(0, rawTokenEstimate - contextTokenEstimate),
+      eventCount: fixture.events?.length ?? 0,
+      segmentCount: result.segments?.length ?? 0
+    },
+    factIds: (fixture.expectedFacts ?? []).map((fact: JsonRecord) => fact.id)
+  };
+}
+
+function fixtureUseCase(fixture: JsonRecord): "customer_support" | "generic" {
+  return fixture.events?.some((event: JsonRecord) => event.metadata?.useCase === "customer_support") ? "customer_support" : "generic";
+}
+
+function adaptiveTextFor(output: JsonRecord) {
+  if (output.kind === "customer_support") {
+    const contextPackage = output.contextPackage;
+    return [
+      JSON.stringify(contextPackage.customer),
+      JSON.stringify(contextPackage.issue),
+      contextPackage.preservedInstructions?.join("\n"),
+      contextPackage.policyConstraints?.join("\n"),
+      contextPackage.troubleshooting?.join("\n"),
+      contextPackage.decisions?.join("\n"),
+      JSON.stringify(contextPackage.escalation),
+      contextPackage.nextActions?.join("\n"),
+      contextPackage.runtimeContext?.content
+    ].join("\n\n");
+  }
+
+  return [
+    output.runtimeContext?.content,
+    output.plan?.segments?.map((segment: JsonRecord) => `${segment.semanticType}: ${segment.operation}. ${segment.reason}`).join("\n")
+  ].join("\n\n");
+}
+
 function buildGoldfishSummary(fixture: JsonRecord) {
   const raw = fixture.events.map((event: JsonRecord) => `${event.role}/${event.type}: ${event.content}`).join("\n\n");
   const words = raw.split(/\s+/);
@@ -484,6 +585,10 @@ function buildGoldfishSummary(fixture: JsonRecord) {
     "...",
     words.slice(-Math.floor(budgetWords * 0.45)).join(" ")
   ].join("\n");
+}
+
+function estimateTokens(text: string) {
+  return Math.ceil(text.length / 4);
 }
 
 function scoreText(name: string, text: string, expectedFacts: JsonRecord[]) {
