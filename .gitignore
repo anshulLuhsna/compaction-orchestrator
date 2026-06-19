@@ -6,3 +6,7 @@ data/*.sqlite-*
 **/data/*.sqlite-*
 .env
 .DS_Store
+
+# Local planning/session artifacts
+council.md/
+council-compaction-orchestrator-oss-plan/
