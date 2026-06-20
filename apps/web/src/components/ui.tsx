@@ -66,7 +66,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export function Tabs({ tabs, value, onChange }: { tabs: string[]; value: string; onChange: (value: string) => void }) {
   return (
-    <div className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 p-1">
+    <div className="flex flex-wrap gap-1 rounded-md border border-zinc-200 bg-zinc-50 p-1">
       {tabs.map((tab) => (
         <button
           key={tab}
