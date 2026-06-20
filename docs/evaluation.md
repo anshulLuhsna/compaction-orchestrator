@@ -4,32 +4,43 @@
 
 The product should not optimize for shorter context alone. The real goal is preserving downstream agent success.
 
-## First Demo
+## Current Demo Set
 
-Build `Goldfish vs Elephant`.
+The current evaluation has moved beyond the first support-only baseline demo.
 
-The first implemented version is the customer-support evaluation in:
+The main metric is now **Agent Continuity under Compaction (ACCS)**, implemented in:
 
 ```text
-scripts/evaluate-customer-support.mjs
+scripts/evaluate-accs.mjs
 ```
 
 Run it with:
 
 ```bash
-npm run eval:support
+npm run eval:accs
 ```
 
-### Goldfish
+It evaluates three fixtures:
 
-Naive baseline:
+- `examples/coding-agent-session.json`
+- `examples/customer-support-session.json`
+- `examples/voice-agent-session.json`
 
-- Fixed threshold
-- One generic summary
-- No segment-level strategy routing
-- No artifact tracking
+## Baselines
 
-### Elephant
+The current eval compares against:
+
+- `raw_full_context`
+- `last_n_messages`
+- `recent_token_window`
+- `front_truncation`
+- `generic_summary`
+- `rolling_summary_recent`
+- `compaction_orchestrator`
+
+The important red-team baseline is `rolling_summary_recent`: summarize older history, then keep recent messages verbatim. That is much closer to common agent memory patterns than a single generic summary.
+
+## Orchestrator
 
 Adaptive router:
 
@@ -58,34 +69,19 @@ Secondary:
 - Human interruptions
 - Number of compaction cycles survived
 
-## First Benchmark Fixture
+## Benchmark Fixtures
 
-Use a synthetic customer-support transcript first:
+### Coding Agent
 
-```text
-examples/customer-support-session.json
-```
+Tests preservation of user constraints, route paths, response shape, active typecheck errors, noisy tool output, and next implementation action.
 
-It includes:
+### Customer Support
 
-- Support policy
-- Customer identity
-- Billing issue
-- Tool output
-- Active error state
-- Escalation decision
-- Next action
+Tests preservation of customer identity, account ID, policy constraints, duplicate invoice facts, active entitlement error, escalation state, and next action.
 
-Later, use a synthetic coding-agent transcript with:
+### Voice Agent
 
-- Several explicit user constraints
-- Repository exploration
-- Multiple file references
-- A failed command with a stack trace
-- A rejected implementation approach
-- A final objective
-
-Run both compaction approaches and ask recall questions afterward.
+Tests preservation of caller intent, consent state, selected appointment slot, low-latency runtime budget, ASR/scheduler noise handling, and next spoken prompt.
 
 ## Recall Question Categories
 
@@ -98,7 +94,15 @@ Run both compaction approaches and ask recall questions afterward.
 
 ## Success Criteria For V0
 
-The adaptive router should beat generic summary on instruction recall, active error recall, and artifact recall while keeping context smaller than the raw transcript.
+The orchestrator should beat simple baselines and the stronger `rolling_summary_recent` baseline on ACCS across all shipped fixtures.
+
+Current strongest-baseline results:
+
+| Fixture | Strongest baseline ACCS | Orchestrator ACCS |
+| --- | ---: | ---: |
+| Coding agent | 0.698 | 0.836 |
+| Customer support | 0.474 | 0.773 |
+| Voice agent | 0.767 | 0.886 |
 
 For the customer-support V0, the adaptive context package should preserve:
 
@@ -112,11 +116,11 @@ For the customer-support V0, the adaptive context package should preserve:
 
 ## Evaluation Modules To Add
 
-### Goldfish Memory
+### Stronger Memory Baselines
 
-Compare generic summary against the adaptive context package.
+Keep testing against summary-plus-recent and token-window baselines, not only generic summaries.
 
-Implemented for customer support.
+Implemented in ACCS.
 
 ### Context Ledger
 

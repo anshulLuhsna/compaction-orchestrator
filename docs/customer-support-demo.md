@@ -79,13 +79,23 @@ The package is more useful than a plain summary because it separates operational
 
 ## Run Evaluation
 
+The main cross-use-case evaluation is now:
+
+```bash
+npm run eval:accs
+```
+
+That compares support, coding, and voice fixtures against simple baselines plus `rolling_summary_recent`.
+
+The support-specific legacy evaluator is still available:
+
 ```bash
 npm run eval:support
 ```
 
 This compares:
 
-### Goldfish
+### Generic Support Summary
 
 A generic first/last summary baseline.
 
@@ -112,16 +122,16 @@ The current run scored:
 
 ```text
 Adaptive recall: 6 / 6
-Goldfish recall: 5 / 6
+Generic support summary recall: 5 / 6
 ```
 
-Goldfish lost the active entitlement state because generic summary dropped `billing_portal_v2=false`.
+The generic support summary lost the active entitlement state because it dropped `billing_portal_v2=false`.
 
 ## Web UI
 
 The web UI includes this fixture as the **Support** demo. With the API and UI running, choose **Support**, click **Run package**, then click **Evaluate**.
 
-The UI also includes a **Coding** fixture for the agent-builder case. That path uses generic compaction rather than the customer-support package endpoint.
+The UI also includes **Coding** and **Voice** fixtures. Those paths use generic compaction rather than the customer-support package endpoint.
 
 ## OpenAI Setup
 

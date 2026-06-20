@@ -10,3 +10,4 @@ data/*.sqlite-*
 # Local planning/session artifacts
 council.md/
 council-compaction-orchestrator-oss-plan/
+stitch_compaction_orchestrator_demo_experience*/

@@ -7,9 +7,10 @@ The repo has a working API-first V0 with SQLite persistence and deterministic co
 Verified commands:
 
 ```bash
-npm run build
 npm run typecheck
-npm run test:smoke
+npm run build:web
+npm run test:accs
+npm run eval:accs
 ```
 
 ## Recommended Next Sequence
@@ -35,17 +36,17 @@ Tasks:
 - Add search over externalized content
 - Later add embeddings
 
-### 3. Add Goldfish vs Elephant Example
+### 3. Expand Realistic Evaluation Fixtures
 
-Goal: make the project demoable.
+Goal: make the project harder to fool.
 
 Tasks:
 
-- Add example transcript fixture
-- Implement generic-summary baseline
-- Run adaptive compaction
-- Print strategy comparison
-- Score recall questions manually at first
+- Add more real or realistic traces beyond the current coding, support, and voice fixtures
+- Add contradicted, superseded, stale, and paraphrased facts
+- Add model-executed next-turn continuation tests
+- Add retrieval baselines that do not know the expected facts ahead of time
+- Keep comparing against `rolling_summary_recent` and `recent_token_window`
 
 ### 4. Add LLM Planner
 
@@ -78,7 +79,7 @@ Proceed in this order:
 ```text
 better segmentation
 -> externalized retrieval
--> Goldfish vs Elephant
+-> stronger evaluation fixtures
 -> LLM planner
 -> dashboard
 ```

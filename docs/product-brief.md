@@ -28,11 +28,13 @@ A single agent turn can use multiple strategies at once. For example, one turn m
 
 The first user is a developer or agent-platform builder who wants reliable long-running agent behavior without manually managing context windows.
 
-## First Use Case
+## Shipped Use Cases
 
-Coding-agent context compaction.
+The repo now includes three public fixtures:
 
-The first demo should show that an adaptive compaction router preserves important task state better than a generic summary:
+### Coding Agent
+
+Shows that an adaptive compaction router preserves important task state better than simple memory baselines and a stronger summary-plus-recent baseline:
 
 - User instructions survive exactly
 - Active errors remain actionable
@@ -40,6 +42,24 @@ The first demo should show that an adaptive compaction router preserves importan
 - Completed exploration is summarized
 - Noisy old tool output is masked
 - Large retrievable context is externalized
+
+### Customer Support
+
+Shows support handoff state that should not be flattened into one summary:
+
+- Customer identity
+- Account ID
+- Refund policy
+- Duplicate invoice facts
+- Billing entitlement error
+- Escalation state
+- Next action
+
+### Voice Agent
+
+Shows a latency-sensitive turn where the context must stay lean without dropping the caller's intent, consent state, selected slot, or next spoken prompt.
+
+Current ACCS results compare against simple baselines and `rolling_summary_recent`, a stronger baseline that summarizes older history and keeps recent messages verbatim.
 
 ## Non-Goals For V0
 

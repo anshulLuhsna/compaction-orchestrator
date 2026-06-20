@@ -254,7 +254,7 @@ This is not a better summarizer. It is a context router.
 
 We are building a pluggable compaction control API for AI agents.
 
-As agent sessions get longer, they start forgetting instructions, losing debugging state, repeating work, or hallucinating details. Most systems solve this with one generic summary or hidden provider compaction, but different types of context need different treatment.
+As agent sessions get longer, they start forgetting instructions, losing debugging state, repeating work, or hallucinating details. Many systems solve this with trimming, one rolling summary, summary-plus-recent memory, or hidden provider compaction. Those are useful, but different types of context still need different treatment.
 
 Our system stores the full session, classifies the context, and lets the agent apply different compaction strategies in the same turn. User instructions stay verbatim, active errors are extracted, old tool logs are masked, large content is externalized, and completed work is summarized.
 
@@ -284,24 +284,32 @@ As agents become part of production workflows, context management becomes core i
 
 ## Demo Pitch
 
-We can show two agents doing the same coding task.
+We can show three concrete agent sessions.
 
-Goldfish uses a generic summary whenever context gets long.
+The baselines use common memory shapes: recent-window trimming, generic summary, and summary-plus-recent memory.
 
-Elephant uses our adaptive compaction router.
+Compaction Orchestrator uses a per-segment compaction plan.
 
-Goldfish forgets constraints, loses error details, or repeats old work.
+In the coding fixture, weaker baselines lose constraints, route requirements, or active error details. In the support fixture, stronger baselines still miss duplicate invoice state. In the voice fixture, summary-plus-recent preserves facts but saves fewer tokens and has no inspectable plan.
 
-Elephant preserves the user instruction, extracts the active error, tracks changed files, externalizes noisy logs, and continues with a smaller but safer context.
+The orchestrator preserves the required state, externalizes noisy context, and records the strategy choice behind every segment.
 
 Then we compare:
 
-- Task success
-- Instruction recall
-- Error recall
-- Artifact recall
-- Hallucinations
-- Tokens used
+- Critical fact recall
+- Exactness preservation
+- Downstream readiness
+- Recoverability
+- Plan inspectability
+- Token reduction
+
+Current strongest-baseline ACCS comparison:
+
+| Fixture | Strongest baseline | Orchestrator |
+| --- | ---: | ---: |
+| Coding agent | 0.698 | 0.836 |
+| Customer support | 0.474 | 0.773 |
+| Voice agent | 0.767 | 0.886 |
 
 ## Current Prototype
 

@@ -57,9 +57,11 @@ http://127.0.0.1:5173
    - active typecheck errors were extracted
    - large noisy tool output was externalized
    - completed exploration was summarized
-7. Click **Evaluate** and show recall versus the generic Goldfish baseline.
+7. Click **Evaluate** and show the ACCS table against simple baselines and `rolling_summary_recent`.
 8. Switch to **Support** and click **Run package**.
 9. Show the typed support handoff: customer, issue, escalation, policy constraints, next actions.
+10. Switch to **Voice** and click **Run compact**.
+11. Show that noisy ASR and scheduler output are moved out of active context while caller intent, consent, selected slot, latency budget, and next spoken prompt survive.
 
 ## What To Say While Showing The Plan
 
@@ -94,6 +96,12 @@ Show the CLI path:
 npm run demo:cli
 ```
 
+Show the voice-agent path:
+
+```bash
+npm run demo:voice
+```
+
 After publishing:
 
 ```bash
@@ -103,3 +111,11 @@ npx @compaction-orchestrator/core examples/coding-agent-session.json
 ## Close
 
 The goal is simple: whenever someone building a custom agent thinks, "I need compaction, but I need control over what gets compacted and how," they should think of Compaction Orchestrator.
+
+Use the honest claim:
+
+```text
+On three curated agent-session fixtures, Compaction Orchestrator beats simple baselines and a stronger summary-plus-recent baseline on ACCS.
+```
+
+Do not claim this proves superiority over every production memory system yet.

@@ -82,6 +82,7 @@ Current demos:
 ```bash
 npm run demo:sdk
 npm run demo:coding
+npm run demo:voice
 ```
 
 ## CLI
@@ -154,18 +155,17 @@ The web app lives in `apps/web`.
 
 The UI currently supports:
 
-- Large editable input session JSON
-- Importing/changing session fixtures
-- Support and Coding demo modes
-- Running customer-support context package generation
-- Running generic compaction
-- Showing the compacted output
-- Showing selected strategy operations
-- Showing metrics
-- Showing externalized content references
-- Running evaluation against a baseline
+- A single guided flow: choose a session, compact it, evaluate it
+- Support, Coding, and Voice demo modes
+- JSON import and raw editing behind a drawer
+- Selected strategy operations
+- Token metrics and externalized content count
+- Optional advanced details for runtime context, events, and plans
+- Live DeepSeek comparison between generic summary and orchestrated context
 
 The UI is useful for demos because it makes the main claim visible: the orchestrator does not just shrink text; it chooses different treatments for different context.
+
+![Compaction Orchestrator UI](./images/ui.png)
 
 Run it with:
 
@@ -212,6 +212,21 @@ It preserves:
 
 It externalizes noisy search/tool output instead of stuffing it into runtime context.
 
+### Voice Agent
+
+The voice-agent demo shows a latency-sensitive compaction case.
+
+It preserves:
+
+- Caller identity
+- Reschedule intent
+- Consent state
+- Selected appointment slot
+- Low-latency token budget
+- Next spoken prompt
+
+It externalizes noisy ASR and scheduler output while keeping active context under the fixture budget.
+
 ## Evaluation
 
 The repo includes deterministic smoke tests and demo evaluations.
@@ -225,6 +240,8 @@ Implemented checks:
 - Customer-support E2E test
 - Customer-support evaluation against a generic baseline
 - Coding-agent demo assertions
+- Voice-agent demo assertions
+- ACCS evaluation against simple baselines and `rolling_summary_recent`
 
 Useful commands:
 
@@ -236,10 +253,12 @@ npm run test:cli
 npm run test:api
 npm run demo:sdk
 npm run demo:coding
+npm run demo:voice
 npm run demo:cli
+npm run eval:accs
 ```
 
-The latest local verification passed for typecheck, build, SDK, CLI, and API integration.
+The latest local verification passed for typecheck, web build, ACCS smoke tests, all-fixture ACCS evaluation, and live UI evaluation.
 
 ## Open Source Readiness
 
@@ -265,7 +284,6 @@ The project is launchable as an alpha/demo repo now.
 
 Before a stronger public launch, the highest-leverage next steps are:
 
-- Make the UI demo more polished for video: clearer before/after, stronger insight panel, cleaner import flow.
 - Decide what to commit from local council artifacts versus what should stay private/untracked.
 - Consider a production persistence option later, likely Postgres, while keeping SQLite as the local default.
 - Add optional LLM-powered planning/summarization behind the existing strategy interface.
@@ -274,4 +292,4 @@ Before a stronger public launch, the highest-leverage next steps are:
 
 The project is no longer just an idea. It has a working SDK, CLI, API, SQLite persistence layer, UI demo, examples, tests, docs, and CI.
 
-The best next move is not more architecture. The best next move is a final launch pass: make the UI demo sharper, decide what artifacts to commit, and then publish the alpha.
+The best next move is not more architecture. The best next move is a final launch pass: decide what artifacts to commit, publish the alpha, and collect feedback from real agent builders.
