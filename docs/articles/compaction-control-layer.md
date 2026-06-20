@@ -78,6 +78,8 @@ One-size-fits-all memory usually fails in boring ways.
 
 That is what makes them dangerous.
 
+![Flattened context vs preserved compaction layers](../images/slab-vs-stack.png)
+
 ### 1. They Preserve Story, Not State
 
 For a customer-support agent, "customer had a billing issue" is not enough.

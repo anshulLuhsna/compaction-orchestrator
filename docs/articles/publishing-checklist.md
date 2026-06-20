@@ -9,9 +9,10 @@
 ## Images
 
 - Hero image: `docs/images/article-hero.png`
+- Failure modes image: `docs/images/slab-vs-stack.png`
 - Product screenshot: `docs/images/ui.png`
 
-Use the hero at the top of the post and the UI screenshot near the section that explains what ships in the alpha.
+Use the hero at the top of the post, the slab-vs-stack image in the failure modes section, and the UI screenshot near the section that explains what ships in the alpha.
 
 ## Reader CTA
 
