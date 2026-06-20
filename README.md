@@ -169,8 +169,6 @@ The UI follows one path: choose a fixture, run compaction, then run the live eva
 
 ![Compaction Orchestrator UI](./docs/images/ui.png)
 
-![Compaction Orchestrator UI](./docs/images/ui.png)
-
 ## Demo 1: Coding Agent
 
 The coding fixture includes:
