@@ -13,7 +13,7 @@
     "dev:web": "npm run dev -w @compaction-orchestrator/web",
     "build:web": "npm run build -w @compaction-orchestrator/web",
     "start": "npm run start -w @compaction-orchestrator/api",
-    "typecheck": "npm run typecheck -w @compaction-orchestrator/core && npm run typecheck -w @compaction-orchestrator/api && npm run typecheck -w @compaction-orchestrator/web",
+    "typecheck": "npm run build -w @compaction-orchestrator/core && npm run typecheck -w @compaction-orchestrator/api && npm run typecheck -w @compaction-orchestrator/web",
     "test:sdk": "npm run build -w @compaction-orchestrator/core && node scripts/sdk-smoke-test.mjs",
     "test:cli": "npm run build -w @compaction-orchestrator/core && node scripts/cli-smoke-test.mjs",
     "test:api": "npm run build && node scripts/api-integration-test.mjs",
