@@ -327,6 +327,96 @@ paths:
                   model:
                     type: string
                 required: [configured, model]
+  /v1/deepseek/status:
+    get:
+      summary: Check DeepSeek configuration
+      responses:
+        "200":
+          description: DeepSeek configuration status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  model:
+                    type: string
+                  baseUrl:
+                    type: string
+                required: [configured, model, baseUrl]
+  /v1/deepseek/probe:
+    post:
+      summary: Run a live DeepSeek next-turn fact probe
+      description: Calls DeepSeek with selected compacted runtime-context candidates and asks the model to answer expected fact probes using only that context.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fixture:
+                  type: object
+                  required: [name, events, expectedFacts]
+                  properties:
+                    name:
+                      type: string
+                    objective:
+                      type: string
+                    desiredBudget:
+                      type: integer
+                    policy:
+                      type: object
+                      additionalProperties: true
+                    useCase:
+                      type: string
+                      enum: [generic, customer_support, customer-support]
+                    events:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/SessionEventInput"
+                    expectedFacts:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, requiredTerms]
+                        properties:
+                          id:
+                            type: string
+                          category:
+                            type: string
+                          expected:
+                            type: string
+                          question:
+                            type: string
+                          requiredTerms:
+                            type: array
+                            items:
+                              type: string
+                candidates:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - raw_full_context
+                      - last_n_messages
+                      - recent_token_window
+                      - front_truncation
+                      - generic_summary
+                      - rolling_summary_recent
+                      - compaction_orchestrator
+              required: [fixture]
+      responses:
+        "200":
+          description: DeepSeek probe result with per-candidate model answers and recall scores.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
 components:
   parameters:
     SessionId:

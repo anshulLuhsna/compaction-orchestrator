@@ -18,6 +18,7 @@ jobs:
       - run: npm run build
       - run: npm run test:sdk
       - run: npm run test:cli
+      - run: npm run test:accs
       - run: npm run test:api
       - run: npm run demo:sdk
       - run: npm run demo:coding

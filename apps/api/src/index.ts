@@ -11,6 +11,7 @@ import { SqliteStore } from "@compaction-orchestrator/core/store";
 import { Hono } from "hono";
 import { z } from "zod";
 import { config as loadDotenv } from "dotenv";
+import { getDeepSeekConfig, runDeepSeekProbe } from "./deepseek.js";
 import { getOpenAIConfig, runOpenAISmokeTest } from "./openai.js";
 
 const envPath = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
@@ -50,6 +51,16 @@ const compactRequestSchema = z.object({
   }).default({})
 });
 
+const evalCandidateNameSchema = z.enum([
+  "raw_full_context",
+  "last_n_messages",
+  "recent_token_window",
+  "front_truncation",
+  "generic_summary",
+  "rolling_summary_recent",
+  "compaction_orchestrator"
+]);
+
 const compactMessageSchema = z.object({
   role: z.enum(["user", "assistant", "tool", "system"]),
   type: z.enum(["message", "tool_call", "tool_output", "decision", "artifact", "compaction"]).optional(),
@@ -64,6 +75,29 @@ const oneShotCompactRequestSchema = compactRequestSchema.extend({
   metadata: z.record(z.unknown()).default({})
 });
 
+const evalFactSchema = z.object({
+  id: z.string().min(1),
+  category: z.string().optional(),
+  expected: z.string().optional(),
+  question: z.string().optional(),
+  requiredTerms: z.array(z.string().min(1)).min(1),
+  weight: z.number().positive().optional(),
+  exact: z.boolean().optional()
+});
+
+const deepSeekProbeSchema = z.object({
+  fixture: z.object({
+    name: z.string().min(1),
+    objective: z.string().optional(),
+    desiredBudget: z.number().int().positive().optional(),
+    policy: z.record(z.unknown()).optional(),
+    useCase: z.enum(["generic", "customer_support", "customer-support"]).optional(),
+    events: z.array(sessionEventInputSchema).min(1),
+    expectedFacts: z.array(evalFactSchema).min(1)
+  }),
+  candidates: z.array(evalCandidateNameSchema).optional()
+});
+
 app.get("/health", (context) => {
   return context.json({ ok: true, service: "compaction-orchestrator-api" });
 });
@@ -74,6 +108,43 @@ app.get("/v1/openai/status", (context) => {
     configured: config.configured,
     model: config.model
   });
+});
+
+app.get("/v1/deepseek/status", (context) => {
+  const config = getDeepSeekConfig();
+  return context.json({
+    configured: config.configured,
+    model: config.model,
+    baseUrl: config.baseUrl
+  });
+});
+
+app.post("/v1/deepseek/probe", async (context) => {
+  const body = await context.req.json().catch(() => undefined);
+  const parsed = deepSeekProbeSchema.safeParse(body);
+  if (!parsed.success) {
+    return context.json({ error: "Invalid DeepSeek probe payload", issues: parsed.error.issues }, 400);
+  }
+
+  const config = getDeepSeekConfig();
+  if (!config.configured) {
+    return context.json({
+      error: "DEEPSEEK_API_KEY is not configured",
+      hint: "Create .env from .env.example and set DEEPSEEK_API_KEY."
+    }, 400);
+  }
+
+  try {
+    const result = await runDeepSeekProbe(parsed.data.fixture, {
+      candidates: parsed.data.candidates
+    });
+    return context.json({ ok: true, ...result });
+  } catch (error) {
+    return context.json({
+      error: "DeepSeek probe failed",
+      message: error instanceof Error ? error.message : String(error)
+    }, 502);
+  }
 });
 
 app.post("/v1/compact", async (context) => {

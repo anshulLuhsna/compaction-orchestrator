@@ -1,0 +1,123 @@
+{
+  "name": "voice-agent-appointment-reschedule-demo",
+  "objective": "Prepare lean context for the next voice-agent turn while preserving caller intent, consent, appointment slot, and latency-sensitive next action.",
+  "desiredBudget": 700,
+  "policy": {
+    "mode": "cost_first",
+    "preserveUserMessagesVerbatim": true,
+    "preserveActiveErrorsVerbatim": false,
+    "allowExternalRetrieval": true
+  },
+  "events": [
+    {
+      "role": "system",
+      "type": "message",
+      "content": "Voice agent policy: keep runtime context under 700 runtime tokens for low-latency turns. Preserve the caller's current intent, confirmed slot values, consent state, and the next spoken prompt exactly enough for the next turn.",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "latency_policy"
+      }
+    },
+    {
+      "role": "user",
+      "type": "message",
+      "content": "Caller says: I need to move my dental cleaning. My name is Priya Nair. Do not cancel it. I only want to reschedule.",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "caller_intent"
+      }
+    },
+    {
+      "role": "tool",
+      "type": "tool_output",
+      "content": "ASR partial transcript stream:\n00:01 caller background noise\n00:02 uh yeah I need to move the dental thing\n00:03 agent asks for identity verification\n00:04 caller confirms name Priya Nair\n00:05 caller says do not cancel it, just reschedule\n00:06 line noise\n00:07 caller asks for next Tuesday afternoon if possible\n00:08 filler transcript fragment\n00:09 filler transcript fragment\n00:10 filler transcript fragment\n00:11 filler transcript fragment\n00:12 filler transcript fragment\n00:13 filler transcript fragment\n00:14 filler transcript fragment\n00:15 filler transcript fragment\n00:16 filler transcript fragment\n00:17 filler transcript fragment\n00:18 filler transcript fragment\n00:19 filler transcript fragment\n00:20 filler transcript fragment\n00:21 filler transcript fragment\n00:22 filler transcript fragment\n00:23 filler transcript fragment\n00:24 filler transcript fragment\n00:25 filler transcript fragment\n00:26 filler transcript fragment\n00:27 filler transcript fragment\n00:28 filler transcript fragment\n00:29 filler transcript fragment\n00:30 filler transcript fragment\n00:31 filler transcript fragment\n00:32 filler transcript fragment\n00:33 filler transcript fragment\n00:34 filler transcript fragment\n00:35 filler transcript fragment\n00:36 filler transcript fragment\n00:37 filler transcript fragment\n00:38 filler transcript fragment\n00:39 filler transcript fragment\n00:40 filler transcript fragment",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "asr_noise",
+        "command": "asr.partial_stream"
+      }
+    },
+    {
+      "role": "tool",
+      "type": "tool_output",
+      "content": "Scheduler lookup for patient Priya Nair:\n- Current appointment: cleaning on 2026-06-24 at 09:30 AM with Dr. Ellis\n- Caller consent state: confirmed_reschedule_only\n- Do not cancel appointment unless caller explicitly says cancel\n- Available slots:\n  - 2026-06-30 14:30 with Dr. Ellis\n  - 2026-07-01 10:00 with Dr. Ellis\n  - 2026-07-02 16:00 with Dr. Ramos\n- Preferred slot selected by caller: 2026-06-30 14:30 with Dr. Ellis\nAdditional scheduler rows:\nrow 001 unrelated hygiene appointment\nrow 002 unrelated hygiene appointment\nrow 003 unrelated hygiene appointment\nrow 004 unrelated hygiene appointment\nrow 005 unrelated hygiene appointment\nrow 006 unrelated hygiene appointment\nrow 007 unrelated hygiene appointment\nrow 008 unrelated hygiene appointment\nrow 009 unrelated hygiene appointment\nrow 010 unrelated hygiene appointment\nrow 011 unrelated hygiene appointment\nrow 012 unrelated hygiene appointment\nrow 013 unrelated hygiene appointment\nrow 014 unrelated hygiene appointment\nrow 015 unrelated hygiene appointment\nrow 016 unrelated hygiene appointment\nrow 017 unrelated hygiene appointment\nrow 018 unrelated hygiene appointment\nrow 019 unrelated hygiene appointment\nrow 020 unrelated hygiene appointment",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "slot_lookup",
+        "command": "scheduler.lookup"
+      }
+    },
+    {
+      "role": "assistant",
+      "type": "decision",
+      "content": "Decision: continue with reschedule flow, not cancellation. Preserve confirmed_reschedule_only and offer 2026-06-30 14:30 with Dr. Ellis as the next spoken confirmation.",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "decision"
+      }
+    },
+    {
+      "role": "tool",
+      "type": "tool_output",
+      "content": "Latency monitor:\nturn budget target: under 700 runtime tokens\nspeech endpoint latency: 310ms\nASR finalization latency: 180ms\nscheduler lookup latency: 240ms\nNo need to replay ASR partial stream in the next model call.",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "latency_observation",
+        "command": "latency.monitor"
+      }
+    },
+    {
+      "role": "assistant",
+      "type": "message",
+      "content": "Next spoken prompt: I can move your cleaning to Tuesday, June 30 at 2:30 PM with Dr. Ellis. Should I confirm that reschedule? I will not cancel the current appointment unless you ask me to.",
+      "metadata": {
+        "useCase": "voice_agent",
+        "semanticType": "next_action"
+      }
+    }
+  ],
+  "expectedFacts": [
+    {
+      "id": "caller_name",
+      "question": "Who is the caller?",
+      "expected": "Priya Nair",
+      "category": "identity",
+      "requiredTerms": ["Priya Nair"]
+    },
+    {
+      "id": "caller_intent",
+      "question": "What does the caller want?",
+      "expected": "Reschedule the dental cleaning, not cancel it.",
+      "category": "instruction",
+      "requiredTerms": ["reschedule", "Do not cancel"]
+    },
+    {
+      "id": "consent_state",
+      "question": "What consent state must be preserved?",
+      "expected": "confirmed_reschedule_only",
+      "category": "exact",
+      "requiredTerms": ["confirmed_reschedule_only"]
+    },
+    {
+      "id": "selected_slot",
+      "question": "Which appointment slot should be offered?",
+      "expected": "2026-06-30 14:30 with Dr. Ellis",
+      "category": "exact",
+      "requiredTerms": ["2026-06-30", "14:30", "Dr. Ellis"]
+    },
+    {
+      "id": "latency_target",
+      "question": "What runtime budget matters for the voice turn?",
+      "expected": "under 700 runtime tokens",
+      "category": "constraint",
+      "requiredTerms": ["under 700 runtime tokens"]
+    },
+    {
+      "id": "next_spoken_prompt",
+      "question": "What should the voice agent ask next?",
+      "expected": "Ask whether to confirm the June 30 2:30 PM reschedule and state that the current appointment will not be cancelled unless asked.",
+      "category": "next",
+      "requiredTerms": ["Should I confirm that reschedule", "will not cancel"]
+    }
+  ]
+}
