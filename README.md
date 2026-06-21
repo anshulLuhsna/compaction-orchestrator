@@ -14,7 +14,8 @@ Compaction Orchestrator gives the agent a plan.
 
 It stores the raw session, classifies the context, chooses a strategy for each segment in the current turn, and returns a smaller runtime context view.
 
-![Compaction plan hero](./docs/images/article-hero.png)
+<img width="2400" height="965" alt="Gemini_Generated_Image_t7whext7whext7wh-Photoroom" src="https://github.com/user-attachments/assets/8a39c61d-c8c2-466b-95c7-90d9349af3b3" />
+
 
 Repo: [github.com/anshulLuhsna/compaction-orchestrator](https://github.com/anshulLuhsna/compaction-orchestrator)
 
