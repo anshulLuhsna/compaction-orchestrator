@@ -1,5 +1,5 @@
 {
-  "name": "@compaction-orchestrator/core",
+  "name": "@anshulluhsna/compaction-orchestrator",
   "version": "0.1.0",
   "description": "Control which compaction strategy your agent uses for each turn and context segment.",
   "license": "MIT",
@@ -27,7 +27,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "compaction-orchestrator": "./dist/cli.js"
+    "compaction-orchestrator": "dist/cli.js"
   },
   "files": [
     "dist",

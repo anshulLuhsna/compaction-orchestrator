@@ -4,7 +4,7 @@ import {
   type EvalCandidateName,
   type EvalFact,
   type EvalFixture
-} from "@compaction-orchestrator/core";
+} from "@anshulluhsna/compaction-orchestrator";
 
 type DeepSeekConfig = {
   configured: boolean;

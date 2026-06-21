@@ -74,7 +74,7 @@ That means I can inspect what happened, evaluate it, override it later, or plug 
 Show the SDK path:
 
 ```ts
-import { compact } from "@compaction-orchestrator/core";
+import { compact } from "@anshulluhsna/compaction-orchestrator";
 
 const result = compact({
   messages,
@@ -105,7 +105,7 @@ npm run demo:voice
 After publishing:
 
 ```bash
-npx @compaction-orchestrator/core examples/coding-agent-session.json
+npx @anshulluhsna/compaction-orchestrator examples/coding-agent-session.json
 ```
 
 ## Close

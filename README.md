@@ -107,7 +107,7 @@ npm run demo:voice
 Use it from code:
 
 ```ts
-import { compact } from "@compaction-orchestrator/core";
+import { compact } from "@anshulluhsna/compaction-orchestrator";
 
 const result = compact({
   messages,
@@ -138,10 +138,23 @@ npm run demo:cli
 After publishing, the intended path is:
 
 ```bash
-npx @compaction-orchestrator/core examples/coding-agent-session.json
+npx @anshulluhsna/compaction-orchestrator examples/coding-agent-session.json
 ```
 
 The CLI returns JSON with selected operations, metrics, runtime context, and optional context package output.
+
+Import a real Claude Code session:
+
+```bash
+find ~/.claude/projects -name "*.jsonl" -type f -print0 \
+  | xargs -0 ls -lt \
+  | head -20
+
+node packages/core/dist/cli.js import claude ~/.claude/projects/<project-slug>/<session-id>.jsonl \
+  --out examples/my-claude-session.json
+```
+
+Then use **Import JSON** in the UI. The importer converts Claude Code JSONL into the same fixture shape as the stock demos.
 
 ## Try the API and UI
 
@@ -231,13 +244,13 @@ import {
   compact,
   compactCustomerSupport,
   messagesToEvents
-} from "@compaction-orchestrator/core";
+} from "@anshulluhsna/compaction-orchestrator";
 ```
 
 Persistence is explicit:
 
 ```ts
-import { SqliteStore } from "@compaction-orchestrator/core/store";
+import { SqliteStore } from "@anshulluhsna/compaction-orchestrator/store";
 ```
 
 ## API Shape

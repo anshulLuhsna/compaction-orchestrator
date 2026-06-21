@@ -1,136 +1,203 @@
-# Your Agent Does Not Need One Summary. It Needs a Compaction Plan.
+# your agent does not need one summary. it needs a compaction plan.
 
-Most long-running agents eventually hit the same wall.
+a friend asked me the right question:
 
-The conversation is too long. The tool logs are noisy. The next model call needs context, but not all of it.
+> if i am a developer and the default context handling works, why should i care about your compactor?
 
-The default move is usually to trim the window, keep recent messages, or make one rolling summary.
+that question is more useful than a compliment.
 
-That is the mistake.
+my answer: "vendor locked" is not enough.
 
-An agent session is not one document. It is a working state. It contains user instructions, active errors, tool outputs, rejected approaches, policy constraints, account state, file paths, and next actions. If you flatten all of that into one summary, you are asking one text blob to do too many jobs.
+most developers do not care that the default compaction is vendor owned if it keeps their agent working. they should not care. tools earn attention when they expose a problem people have already felt or are about to feel.
 
-Compaction should not be a hidden summarization step.
+the problem is not that default compaction exists somewhere else.
 
-It should be a plan.
+the problem is that compaction becomes part of agent correctness, and most teams still treat it like cleanup.
 
-Compaction Orchestrator is a small open-source control layer for that plan. It stores the raw session, breaks it into context segments, chooses a compaction strategy per segment, and returns a smaller runtime context view plus an inspectable record of what happened.
+![compaction plan hero](../images/article-hero.png)
 
-Same session. Smaller context. Different survival rules.
+repo: [github.com/anshulluhsna/compaction-orchestrator](https://github.com/anshulluhsna/compaction-orchestrator)
 
-![Compaction plan hero](../images/article-hero.png)
+## the problem is still under-named
 
-The repo is here: [github.com/anshulLuhsna/compaction-orchestrator](https://github.com/anshulLuhsna/compaction-orchestrator)
+if this problem were obvious, there would already be a crowded market of compaction tools.
 
-## The Problem Is Not Context Length
+there is not.
 
-Context length is the visible problem.
+that does not mean the problem is fake. it means most teams only notice it after their agent starts running long enough to forget the wrong thing.
 
-State loss is the real one.
+in finished products like chatgpt, cursor, claude code, or other agent harnesses, context management is part of the product experience. you may never see the compaction step.
 
-A generic summary, or even a summary-plus-recent buffer, can preserve the narrative and still break the next turn. It may remember that there was a billing issue, but lose the duplicate invoice ID. It may remember that the coding agent had a type error, but blur the exact missing module. It may preserve the general user request, but drop the constraint that the agent must use Hono and not Express.
+but when you build a custom agent, you usually own the model-call boundary. you decide what messages, tool outputs, summaries, cached state, and retrieved facts go into the next call.
 
-That is why "summary quality" is the wrong evaluation target.
+so teams build their own version of compaction anyway:
 
-The question is simpler and harsher:
+- keep the last few messages
+- summarize older turns
+- pin system instructions
+- trim tool outputs
+- store large artifacts elsewhere
+- hand-roll special rules for support, coding, voice, or internal workflows
+
+compaction orchestrator is a name and interface for that layer.
+
+## the hidden job of compaction
+
+long-running agents eventually collect too much context: chat history, tool output, failed tool calls, partial decisions, old plans, user constraints, policy rules, api responses, error traces, and next actions.
+
+the obvious move is to summarize.
+
+that works until the summary preserves the story and loses the state.
+
+"the customer had a billing issue" sounds reasonable. it is also useless if the next turn needs the duplicate invoice ids, the refund threshold, the entitlement error, and the exact promise the agent is allowed to make.
+
+"the build failed" sounds reasonable. it is also useless if the next turn needs the missing module path and the exact exported member that failed.
+
+"the caller wants to change an appointment" sounds reasonable. it is dangerous if the agent forgets that the caller said do not cancel, only reschedule.
+
+this is the difference:
 
 ```text
-Can the next agent turn continue correctly after compaction?
+summary asks: what happened?
+compaction asks: what must survive for the next turn to work?
 ```
 
-That is what we now measure with **Agent Continuity under Compaction**, or ACCS.
+that is why one summary is the wrong primitive.
 
-## What a Compaction Plan Does
+## why default is not the enemy
 
-A compaction plan treats different context differently.
+default compaction can be perfectly fine for general chat, coding products, or casual long conversations.
 
-In the current alpha, a session goes through this shape:
+the issue starts when you are building a custom agent and you control the model-call boundary. at that point, context is no longer just text. it is runtime state.
+
+a customer-support agent has operational state.
+
+a voice agent has latency pressure, tool noise, slot values, and consent state.
+
+a coding agent has exact errors, file paths, rejected approaches, and user constraints.
+
+those are different failure modes.
+
+if a default compactor hides the decision, you cannot inspect why something survived, why something was rewritten, or why the next turn went wrong. if you write your own one-off rules, you still end up admitting the same thing: compaction needs a control layer.
+
+that is the space compaction orchestrator is trying to occupy.
+
+not "better summaries."
+
+control over what kind of context survives.
+
+## the philosophical shift
+
+an agent session is not one document.
+
+it is a working state made of different materials.
+
+some context should stay verbatim. some should be reduced to an active error. some should be summarized. some should be moved out of the runtime window but remain retrievable. some should be masked. some should not survive at all.
+
+![flattened context vs preserved compaction layers](../images/slab-vs-stack.png)
+
+compaction orchestrator turns that into a plan:
 
 ```text
-raw events
+raw session events
 -> segment classification
--> strategy routing
--> compacted runtime context
--> inspectable plan
+-> per-segment strategy routing
+-> runtime context view
+-> inspectable compaction plan
 ```
 
-The built-in strategies are intentionally plain:
-
-- `keep_verbatim`
-- `extract_active_error`
-- `externalize_for_retrieval`
-- `mask_tool_output`
-- `structured_summary`
-
-The important part is not that these are magical strategies. They are not.
-
-The important part is the boundary.
-
-User instructions can be kept verbatim. Active errors can be extracted. Noisy tool output can be externalized. Completed exploration can be summarized. A customer-support handoff can preserve policy, escalation state, and next action.
-
-One turn can use more than one strategy.
-
-That is the product.
-
-## The Failure Modes
-
-One-size-fits-all memory usually fails in boring ways.
-
-That is what makes them dangerous.
-
-![Flattened context vs preserved compaction layers](../images/slab-vs-stack.png)
-
-### 1. They Preserve Story, Not State
-
-For a customer-support agent, "customer had a billing issue" is not enough.
-
-The next turn needs the customer name, account ID, invoice IDs, refund policy, active entitlement error, escalation state, and what the agent should say next.
-
-In our support fixture, the generic summary missed the duplicate invoice pair. Compaction Orchestrator preserved it.
-
-That mattered in the live DeepSeek probe:
+one turn can mix strategies:
 
 ```text
-generic_summary: 5/6 fact recall
-compaction_orchestrator: 6/6 fact recall
+user constraint      -> keep_verbatim
+active failure       -> extract_active_error
+large tool output    -> externalize_for_retrieval
+completed work       -> structured_summary
+support handoff      -> preserve policy, escalation, next action
+voice turn           -> preserve intent, consent, slot, latency target
 ```
 
-Same model. Same fixture. Different context view.
+the important part is not that these strategy names are magical. they are deliberately plain.
 
-### 2. They Blur Exact Strings
+the important part is that the decision is visible.
 
-Coding agents often need exact strings, not vibes.
+you can inspect the plan. you can compare it to baselines. you can add your own strategy. you can test whether the next agent turn still has the facts it needs.
 
-These are different facts:
+## the customer-support example
+
+customer support is the easiest place to feel the problem.
+
+a generic summary might say:
 
 ```text
-There was a typecheck issue.
+the customer has a duplicate billing issue and needs help with entitlement.
 ```
+
+that reads fine.
+
+but the agent may need:
 
 ```text
-Cannot find module './billing-store.js'
-no exported member 'billingRouter'
+customer: maya chen
+account: acct_7921
+duplicate invoices: inv_001921 and inv_001922
+refund policy: refund allowed only after duplicate charge verification
+active error: entitlement service returned entitlement_sync_failed
+next action: explain escalation, do not promise instant refund
 ```
 
-One tells the agent that something failed.
+if the summary drops one of those, the next turn can sound confident and still be wrong.
 
-The other tells the agent what to fix.
+this is why "summary quality" is too soft as an evaluation target. a compaction system should be judged by continuity:
 
-Compaction Orchestrator can route active errors through `extract_active_error` instead of letting them dissolve into prose.
+```text
+can the next agent turn continue correctly after compaction?
+```
 
-### 3. They Hide The Decision
+that is what the repo's evaluation metric, agent continuity under compaction, is built around.
 
-Hidden compaction is hard to debug.
+## the voice-agent example
 
-If the harness silently decides what survives, you cannot inspect the decision, compare strategies, or explain why the next agent turn went off track.
+at first glance, voice agents look like they should need less compaction. the turns are short. the agent needs to be fast.
 
-The plan is not a nice-to-have artifact.
+but real voice agents are not just back-and-forth chat.
 
-It is the debugging surface.
+they book appointments. cancel appointments. call tools. recover from bad tool calls. handle asr noise. keep latency low. carry slot values across turns.
 
-## The Current Evidence
+and sometimes old tool output is still useful.
 
-We compare seven candidates:
+if the agent looked up available appointment slots, throwing away the tool output blindly can hurt the next turn. keeping the whole thing can also hurt the next turn because voice agents have tight latency budgets.
+
+so the decision is runtime specific:
+
+```text
+asr noise                  -> remove or summarize
+selected slot              -> keep exactly
+consent state              -> keep exactly
+full scheduler response    -> externalize
+next spoken prompt         -> keep lean
+latency target             -> preserve as constraint
+```
+
+that is hard to express as one universal compaction rule.
+
+## the coding-agent example
+
+coding agents expose a different failure mode.
+
+they often do not need a beautiful summary. they need exact strings.
+
+the next turn may depend on a file path, a route name, a test command, a type error, or a user constraint like "use this framework, do not add a different one."
+
+if those get paraphrased, the model may still understand the rough task but lose the thing that would have made the next action correct.
+
+that is why the orchestrator can route active build failures differently from old exploration notes.
+
+different context. different survival rule.
+
+## the evidence so far
+
+the repo currently compares these candidates:
 
 - `raw_full_context`
 - `last_n_messages`
@@ -140,162 +207,76 @@ We compare seven candidates:
 - `rolling_summary_recent`
 - `compaction_orchestrator`
 
-ACCS rewards critical fact recall, exactness, downstream readiness, recoverability, inspectability, and token reduction. It penalizes hallucinated or irrelevant retained context.
+agent continuity under compaction rewards critical fact recall, exactness, downstream readiness, recoverability, inspectability, and token reduction. it penalizes hallucinated or irrelevant retained context.
 
-Latest deterministic results:
+current deterministic results:
 
-| Fixture | Generic summary ACCS | Strongest baseline ACCS | Orchestrator ACCS | Read |
+| fixture | generic summary accs | rolling_summary_recent accs | compaction_orchestrator accs | read |
 | --- | ---: | ---: | ---: | --- |
-| Coding agent | 0.548 | 0.698 | 0.836 | Rolling summary preserves facts, but uses more context and has no plan |
-| Customer support | 0.410 | 0.474 | 0.773 | Stronger baseline still misses duplicate invoice state |
-| Voice agent | 0.430 | 0.767 | 0.886 | Stronger baseline preserves facts, but saves fewer tokens and has no plan |
+| coding agent | 0.548 | 0.698 | 0.836 | rolling summary preserves facts, but uses more context and has no plan |
+| customer support | 0.410 | 0.474 | 0.773 | rolling summary still misses duplicate invoice state |
+| voice agent | 0.430 | 0.767 | 0.886 | rolling summary preserves facts, but saves fewer tokens and has no plan |
 
-Latest live DeepSeek probe:
+the support fixture also has a live deepseek probe:
 
-| Fixture | Generic summary | Compaction Orchestrator | Read |
+| fixture | generic summary | compaction orchestrator | read |
 | --- | ---: | ---: | --- |
-| Customer support | 5/6 fact recall | 6/6 fact recall | Orchestrator wins clearly |
-| Coding agent | 5/5 fact recall | 5/5 fact recall | Both answer probes, but orchestrator has the inspectable plan |
+| customer support | 5/6 fact recall | 6/6 fact recall | orchestrator preserved the duplicate invoice pair |
+| coding agent | 5/5 fact recall | 5/5 fact recall | both answered, but only one had an inspectable plan |
 
-The support fixture is the clean live-model demo.
+this is not meant to claim that generic summaries are always bad.
 
-DeepSeek could recover every required next-turn fact from the orchestrated context. It missed the duplicate invoice pair from the generic summary.
+that would be too convenient.
 
-The coding fixture shows a different point. DeepSeek answered the probes from both compacted contexts, but ACCS still prefers the orchestrator because the state is preserved with explicit operations and recoverability.
+the stronger claim is narrower: when compaction affects correctness, you need to know what the compactor did and why.
 
-That distinction matters.
+sometimes the win is recall.
 
-Sometimes the win is better recall.
+sometimes the win is control.
 
-Sometimes the win is control.
+## who this is for
 
-## What Ships In The Alpha
+this is not for someone using chatgpt as a product.
 
-This is not a research sketch.
+it is not trying to replace the memory behavior inside cursor, claude code, or any other finished agent product.
 
-The repo currently has:
+compaction orchestrator is for builders who own the context they send into the model:
 
-- SDK for agent loops
-- CLI for JSON fixtures
-- HTTP API for sidecar use
-- SQLite persistence for sessions, events, plans, context views, and externalized content
-- Web UI for demos and inspection
-- Coding-agent, customer-support, and voice-agent fixtures
-- ACCS evaluation scripts
-- Optional live DeepSeek probe
+- custom support agents
+- voice agents
+- coding-agent harnesses
+- internal workflow agents
+- agent platforms that need different compaction policies per customer or use case
 
-The fastest path is the SDK:
+if your agent only has short conversations, you probably do not need this.
 
-```ts
-import { compact } from "@compaction-orchestrator/core";
+if forgetting the wrong detail costs money, trust, latency, or correctness, compaction should not be invisible.
 
-const result = compact({
-  messages,
-  objective: "Prepare context for the next agent turn.",
-  policy: {
-    mode: "balanced",
-    preserveUserMessagesVerbatim: true,
-    allowExternalRetrieval: true
-  }
-});
+## what the repo gives you
 
-console.log(result.contextView.content);
-console.log(result.plan.segments.map((segment) => segment.operation));
-```
+the repo is the implementation layer:
 
-The demo path is the UI.
+- sdk for agent loops
+- cli for json fixtures
+- http api for sidecar use
+- sqlite persistence for sessions, events, plans, context views, and externalized content
+- web ui for demos and inspection
+- coding, support, and voice fixtures
+- accs evaluation scripts
+- optional live deepseek probe
 
-Load a fixture, run compaction, inspect the strategy choices, and compare against simple and summary-plus-recent baselines.
+the readme has the setup commands, sdk snippets, and demo instructions.
 
-![Compaction Orchestrator UI](../images/ui.png)
+the article only needs one invitation:
 
-## What You Can Do With The Repo
+try it against your own agent session.
 
-If you want to try it, the repo is designed to be useful without reading the whole codebase.
+add the facts your next turn must preserve. run your usual compaction strategy. run the orchestrated plan. see which one lets the next turn continue correctly.
 
-Clone it:
+that is the point.
 
-```bash
-git clone https://github.com/anshulLuhsna/compaction-orchestrator.git
-cd compaction-orchestrator
-npm install
-```
+not one more summary.
 
-Run the fastest demos:
+a compaction plan.
 
-```bash
-npm run demo:coding
-npm run demo:voice
-npm run eval:accs
-```
-
-Run the UI:
-
-```bash
-npm run dev
-npm run dev:web
-```
-
-Then open:
-
-```text
-http://127.0.0.1:5173
-```
-
-Use the SDK inside an agent loop when you want control at the model-call boundary. Use the HTTP API when you want a sidecar service with SQLite persistence. Use the fixtures and ACCS scripts when you want to test whether your own compaction strategy preserves the facts needed for the next turn.
-
-That is the invitation: fork it, add a strategy, add a fixture from your own agent, and see whether the compaction plan actually helps the next turn continue.
-
-## Comparison
-
-| Dimension | One-size-fits-all memory | Compaction plan |
-| --- | --- | --- |
-| Main unit | Whole session | Context segment |
-| Strategy | One rewrite | Per-segment routing |
-| User constraints | Often paraphrased | Can be kept verbatim |
-| Active errors | Often blurred | Extracted as error signal |
-| Tool output | Summarized or retained blindly | Externalized with reference |
-| Use-case behavior | Same shape everywhere | Different policies per use case |
-| Debugging | Output only | Output plus plan |
-| Evaluation | Summary resemblance | Next-turn continuity |
-
-This is the core bet:
-
-```text
-The right abstraction is not compression.
-The right abstraction is compaction control.
-```
-
-## What Is Still Unsound
-
-The alpha is honest about its rough edges.
-
-The classifier is heuristic. The built-in strategies are deterministic. SQLite is the right local store for an alpha, not the final answer for every production deployment. The live DeepSeek probe is a useful external check, not a universal benchmark.
-
-Good.
-
-Those pieces can improve behind the interface.
-
-The interface is the point: store the session, classify the segments, choose strategies, return the context, expose the plan.
-
-## What This Means If You Are Building Agents
-
-First, stop treating compaction as cleanup.
-
-If your agent runs for many turns, compaction is part of execution. It should be observable.
-
-Second, preserve exactness where exactness matters.
-
-Commands, route paths, policy constraints, active errors, invoice IDs, and next actions should not be casually paraphrased.
-
-Third, evaluate continuity, not prettiness.
-
-A nice summary that loses the next action is worse than an ugly context package that lets the agent continue.
-
-The model does not need one beautiful summary.
-
-It needs the right facts to survive.
-
-And the developer needs to know why they survived.
-
-That is the plan.
+![compaction orchestrator ui](../images/ui.png)

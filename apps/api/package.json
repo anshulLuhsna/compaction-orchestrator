@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@compaction-orchestrator/core": "file:../../packages/core",
+    "@anshulluhsna/compaction-orchestrator": "file:../../packages/core",
     "@hono/node-server": "^1.14.4",
     "@hono/zod-validator": "^0.8.0",
     "dotenv": "^17.4.2",

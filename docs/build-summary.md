@@ -50,13 +50,13 @@ It includes:
 The public package root is intentionally SDK-focused:
 
 ```ts
-import { compact, compactCustomerSupport } from "@compaction-orchestrator/core";
+import { compact, compactCustomerSupport } from "@anshulluhsna/compaction-orchestrator";
 ```
 
 Persistence is explicit:
 
 ```ts
-import { SqliteStore } from "@compaction-orchestrator/core/store";
+import { SqliteStore } from "@anshulluhsna/compaction-orchestrator/store";
 ```
 
 ## SDK
@@ -98,7 +98,7 @@ compaction-orchestrator examples/coding-agent-session.json
 After package publishing, the intended shape is:
 
 ```bash
-npx @compaction-orchestrator/core examples/coding-agent-session.json
+npx @anshulluhsna/compaction-orchestrator examples/coding-agent-session.json
 ```
 
 The CLI prints JSON containing the selected operations, metrics, runtime context, and optional context package.

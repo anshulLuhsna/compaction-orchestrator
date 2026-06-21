@@ -1,4 +1,4 @@
-# @compaction-orchestrator/core
+# @anshulluhsna/compaction-orchestrator
 
 Control which compaction strategy your agent chooses for each turn and context segment.
 
@@ -7,13 +7,13 @@ This package is the SDK and CLI for Compaction Orchestrator. It is not just anot
 ## Install
 
 ```bash
-npm install @compaction-orchestrator/core
+npm install @anshulluhsna/compaction-orchestrator
 ```
 
 ## SDK
 
 ```ts
-import { compact } from "@compaction-orchestrator/core";
+import { compact } from "@anshulluhsna/compaction-orchestrator";
 
 const result = compact({
   messages,
@@ -33,7 +33,7 @@ console.log(result.plan.segments.map((segment) => segment.operation));
 ## Customer Support Package
 
 ```ts
-import { compactCustomerSupport } from "@compaction-orchestrator/core";
+import { compactCustomerSupport } from "@anshulluhsna/compaction-orchestrator";
 
 const handoff = compactCustomerSupport({
   messages,
@@ -48,13 +48,13 @@ console.log(handoff.contextPackage.nextActions);
 ## CLI
 
 ```bash
-npx @compaction-orchestrator/core examples/coding-agent-session.json
+npx @anshulluhsna/compaction-orchestrator examples/coding-agent-session.json
 ```
 
 You can also pipe JSON through stdin:
 
 ```bash
-cat session.json | npx @compaction-orchestrator/core
+cat session.json | npx @anshulluhsna/compaction-orchestrator
 ```
 
 ## Persistence
@@ -62,7 +62,7 @@ cat session.json | npx @compaction-orchestrator/core
 The package root is SDK-first. Persistence is available through an explicit subpath:
 
 ```ts
-import { SqliteStore } from "@compaction-orchestrator/core/store";
+import { SqliteStore } from "@anshulluhsna/compaction-orchestrator/store";
 ```
 
 SQLite is useful for local API/server workflows where you want durable sessions, compaction plans, context views, and externalized content.

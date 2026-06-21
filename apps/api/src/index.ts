@@ -6,8 +6,8 @@ import {
   buildCustomerSupportContextPackage,
   compactSession,
   sessionEventInputSchema
-} from "@compaction-orchestrator/core";
-import { SqliteStore } from "@compaction-orchestrator/core/store";
+} from "@anshulluhsna/compaction-orchestrator";
+import { SqliteStore } from "@anshulluhsna/compaction-orchestrator/store";
 import { Hono } from "hono";
 import { z } from "zod";
 import { config as loadDotenv } from "dotenv";

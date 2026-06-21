@@ -5,7 +5,7 @@ The fastest way to try Compaction Orchestrator is the core SDK path. It does not
 Use it when you want more control over the compaction your agent chooses at the model-call boundary. A single turn can mix strategies: preserve user constraints, extract the active error, externalize noisy logs, and summarize completed exploration.
 
 ```ts
-import { compact } from "@compaction-orchestrator/core";
+import { compact } from "@anshulluhsna/compaction-orchestrator";
 
 const result = compact({
   messages: [
@@ -60,13 +60,13 @@ import {
   messagesToEvents,
   compactSession,
   defaultStrategies
-} from "@compaction-orchestrator/core";
+} from "@anshulluhsna/compaction-orchestrator";
 ```
 
 SQLite persistence is a separate subpath so plain SDK users do not load the server store:
 
 ```ts
-import { InMemoryStore, SqliteStore } from "@compaction-orchestrator/core/store";
+import { InMemoryStore, SqliteStore } from "@anshulluhsna/compaction-orchestrator/store";
 ```
 
 ## Agent Loop Shape

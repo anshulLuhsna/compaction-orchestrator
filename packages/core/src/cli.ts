@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { stdin, stdout, stderr } from "node:process";
+import { claudeCodeJsonlToFixture } from "./importers.js";
 import { compact } from "./sdk.js";
 import type { CompactInput, CompactMessage } from "./sdk.js";
 
@@ -20,6 +21,11 @@ async function main() {
 
   if (args.includes("--help") || args.includes("-h")) {
     printHelp();
+    return;
+  }
+
+  if (args[0] === "import") {
+    await runImport(args.slice(1));
     return;
   }
 
@@ -62,6 +68,36 @@ async function main() {
   stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }
 
+async function runImport(args: string[]) {
+  const source = args[0];
+  const inputPath = positionalArgs(args.slice(1))[0];
+
+  if (source !== "claude") {
+    throw new Error("Unknown import source. Supported sources: claude");
+  }
+
+  const outPath = valueAfter(args, "--out");
+  const name = valueAfter(args, "--name");
+  const objective = valueAfter(args, "--objective");
+  const desiredBudget = numberAfter(args, "--desired-budget");
+  const maxToolOutputChars = numberAfter(args, "--max-tool-output-chars");
+  const text = inputPath ? await readFile(inputPath, "utf8") : await readStdin();
+  const fixture = claudeCodeJsonlToFixture(text, {
+    name,
+    sourcePath: inputPath,
+    objective,
+    desiredBudget,
+    maxToolOutputChars
+  });
+  const output = `${JSON.stringify(fixture, null, 2)}\n`;
+
+  if (outPath) {
+    await writeFile(outPath, output);
+  } else {
+    stdout.write(output);
+  }
+}
+
 async function readFixture(path: string | undefined): Promise<Fixture> {
   const text = path ? await readFile(path, "utf8") : await readStdin();
   return JSON.parse(text) as Fixture;
@@ -79,12 +115,51 @@ function inferUseCase(messages: CompactMessage[]): CompactInput["useCase"] {
   return messages.some((message) => message.metadata?.useCase === "customer_support") ? "customer_support" : "generic";
 }
 
+function valueAfter(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
+function numberAfter(args: string[], flag: string): number | undefined {
+  const value = valueAfter(args, flag);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Expected a number after ${flag}.`);
+  }
+
+  return parsed;
+}
+
+function positionalArgs(args: string[]): string[] {
+  const positionals: string[] = [];
+  const flagsWithValues = new Set(["--out", "--name", "--objective", "--desired-budget", "--max-tool-output-chars"]);
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (flagsWithValues.has(arg)) {
+      index += 1;
+      continue;
+    }
+
+    if (!arg.startsWith("-")) {
+      positionals.push(arg);
+    }
+  }
+
+  return positionals;
+}
+
 function printHelp() {
   stdout.write(`Compaction Orchestrator CLI
 
 Usage:
   compaction-orchestrator <fixture.json>
   compaction-orchestrator < fixture.json
+  compaction-orchestrator import claude <session.jsonl> [--out fixture.json]
 
 Input JSON:
   {
@@ -96,6 +171,10 @@ Input JSON:
 
 Output:
   JSON summary with operations, metrics, runtime context, and optional contextPackage.
+
+Import:
+  Convert Claude Code JSONL from ~/.claude/projects into a Compaction Orchestrator fixture.
+  Options: --out, --name, --objective, --desired-budget, --max-tool-output-chars.
 `);
 }
 
