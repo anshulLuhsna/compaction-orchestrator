@@ -52,7 +52,7 @@ Used for:
 - Long docs
 - Tool output that may be needed later
 
-Current V0 only emits the reference. Durable storage for externalized content is a next step.
+The zero-server SDK returns the external reference in the context view. The SQLite store can persist externalized content when you use the API or store layer.
 
 ### `mask_tool_output`
 

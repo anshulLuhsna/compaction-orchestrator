@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { compact, compactCustomerSupport, messagesToEvents } from "../packages/core/dist/index.js";
+import { compact, compactCustomerSupport, defaultStrategies, messagesToEvents } from "../packages/core/dist/index.js";
 
 const generic = compact({
   messages: [
@@ -90,6 +90,38 @@ assert.equal(support.contextPackage.escalation.required, true);
 assert.equal(support.contextPackage.escalation.targetTeam, "Billing Ops");
 assert.match(support.contextPackage.runtimeContext.content, /billing_portal_v2=false/);
 assert.match(support.contextPackage.nextActions.join("\n"), /do not promise/i);
+
+const customSupportStrategy = {
+  name: "custom_support_test_strategy",
+  supports: () => true,
+  estimate: () => ({
+    tokenSavings: 1,
+    preservationRisk: "low",
+    latency: "low",
+    confidence: 1
+  }),
+  execute: (segment) => ({
+    content: `custom:${segment.content}`,
+    provenance: [segment.id],
+    tokenEstimate: 1
+  }),
+  validate: () => ({ passed: true, checks: ["custom strategy executed"], warnings: [] })
+};
+
+const supportWithCustomStrategy = compactCustomerSupport({
+  messages: [
+    {
+      role: "assistant",
+      content: "Support issue: duplicate invoice pair must be visible in handoff.",
+      metadata: {
+        semanticType: "support_issue"
+      }
+    }
+  ],
+  strategies: [customSupportStrategy, ...defaultStrategies()]
+});
+
+assert.equal(supportWithCustomStrategy.plan.segments[0]?.operation, "custom_support_test_strategy");
 
 const events = messagesToEvents([
   {

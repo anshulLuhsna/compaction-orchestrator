@@ -52,7 +52,8 @@ export function compact(input: CompactInput): CompactOutput {
       events,
       objective,
       desiredBudget: input.desiredBudget,
-      policy: input.policy
+      policy: input.policy,
+      strategies: input.strategies
     });
 
     return {

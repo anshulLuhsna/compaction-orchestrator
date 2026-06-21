@@ -103,6 +103,34 @@ while (true) {
 
 The important part is that `compacted.plan.segments` tells you what strategy was chosen for each segment in that turn. That plan is the control surface: you can inspect it, evaluate it, persist it, or replace the built-in strategies with domain-specific ones.
 
+Custom strategies can be passed through both the generic path and the customer-support package path:
+
+```ts
+import { compact, defaultStrategies, type CompactionStrategy } from "@anshulluhsna/compaction-orchestrator";
+
+const keepBillingFacts: CompactionStrategy = {
+  name: "keep_billing_facts",
+  supports: (segment) => /invoice|refund|entitlement/i.test(segment.content),
+  estimate: () => ({
+    tokenSavings: 0,
+    preservationRisk: "low",
+    latency: "low",
+    confidence: 1
+  }),
+  execute: (segment) => ({
+    content: segment.content,
+    provenance: [segment.id],
+    tokenEstimate: segment.tokenEstimate
+  }),
+  validate: () => ({ passed: true, checks: ["kept billing fact verbatim"], warnings: [] })
+};
+
+const compacted = compact({
+  messages,
+  strategies: [keepBillingFacts, ...defaultStrategies()]
+});
+```
+
 For customer support, use the typed package:
 
 ```ts

@@ -95,6 +95,7 @@ assert.match(importedFixture.events.map((event) => event.content).join("\n"), /U
 
 const codexJsonlPath = join(tempDir, "codex-session.jsonl");
 const codexFixturePath = join(tempDir, "codex-fixture.json");
+const codexWithDeveloperFixturePath = join(tempDir, "codex-fixture-with-developer.json");
 await writeFile(codexJsonlPath, [
   JSON.stringify({
     timestamp: "2026-06-21T00:00:00.000Z",
@@ -108,6 +109,15 @@ await writeFile(codexJsonlPath, [
   }),
   JSON.stringify({
     timestamp: "2026-06-21T00:00:01.000Z",
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "developer",
+      content: [{ type: "input_text", text: "Developer instruction: never expose secrets." }]
+    }
+  }),
+  JSON.stringify({
+    timestamp: "2026-06-21T00:00:01.500Z",
     type: "response_item",
     payload: {
       type: "message",
@@ -164,6 +174,23 @@ assert.equal(codexFixture.events.length, 4);
 assert.ok(codexFixture.events.some((event) => event.type === "tool_call" && event.metadata.toolName === "exec_command"));
 assert.ok(codexFixture.events.some((event) => event.type === "tool_output" && event.metadata.semanticType === "active_error"));
 assert.match(codexFixture.events.map((event) => event.content).join("\n"), /Do not add Express/);
+assert.equal(codexFixture.events.some((event) => /never expose secrets/.test(event.content)), false);
+
+await execFileAsync("node", [
+  "packages/core/dist/cli.js",
+  "import",
+  "codex",
+  codexJsonlPath,
+  "--out",
+  codexWithDeveloperFixturePath,
+  "--include-developer"
+]);
+
+const codexWithDeveloperFixture = JSON.parse(await readFile(codexWithDeveloperFixturePath, "utf8"));
+const developerEvent = codexWithDeveloperFixture.events.find((event) => /never expose secrets/.test(event.content));
+assert.ok(developerEvent);
+assert.equal(developerEvent.role, "system");
+assert.equal(developerEvent.metadata.codexOriginalRole, "developer");
 
 console.log(JSON.stringify({
   ok: true,

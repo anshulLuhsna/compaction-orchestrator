@@ -1,5 +1,6 @@
 import type {
   CompactionPolicy,
+  CompactionStrategy,
   ContextPackage,
   ContextSegment,
   RuntimeContextView,
@@ -14,6 +15,7 @@ export type BuildContextPackageInput = {
   objective: string;
   desiredBudget?: number;
   policy?: CompactionPolicy;
+  strategies?: CompactionStrategy[];
 };
 
 export function buildCustomerSupportContextPackage(input: BuildContextPackageInput): {

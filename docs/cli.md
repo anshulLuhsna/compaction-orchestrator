@@ -90,6 +90,8 @@ Then use **Import JSON** in the web UI.
 
 The Codex importer preserves user messages, assistant messages, tool calls, tool outputs, source session id, cwd, model, timestamps, and call ids where available. It skips encrypted reasoning and developer/system messages by default. Add `--include-developer` only if you explicitly want developer/system instructions in the fixture.
 
+Imported local traces may contain file paths, tool output, private code, API responses, or secrets. Review generated fixtures before sharing them or committing them.
+
 Output is JSON with:
 
 - `operations`

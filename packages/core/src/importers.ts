@@ -230,8 +230,9 @@ function convertCodexEntry(
   const metadata = baseCodexMetadata(entry);
 
   if (payloadType === "message") {
-    const role = normalizeRole(asString(payload.role));
-    if (!role || (role === "system" && !options.includeDeveloperMessages)) {
+    const rawRole = asString(payload.role);
+    const role = rawRole === "developer" ? "system" : normalizeRole(rawRole);
+    if (!role || ((role === "system" || rawRole === "developer") && !options.includeDeveloperMessages)) {
       return [];
     }
 
@@ -246,6 +247,7 @@ function convertCodexEntry(
       content,
       metadata: removeUndefined({
         ...metadata,
+        codexOriginalRole: rawRole,
         codexPhase: payload.phase,
         semanticType: role === "user" ? "user_instruction" : undefined
       })

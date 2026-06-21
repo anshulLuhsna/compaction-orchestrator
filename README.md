@@ -76,7 +76,7 @@ The repo ships with three runnable fixtures. Each one is designed around a diffe
 
 Current ACCS examples:
 
-| Use case | Generic summary ACCS | Strongest baseline ACCS | Compaction Orchestrator ACCS | Demo command |
+| Use case | Generic summary ACCS | `rolling_summary_recent` ACCS | Compaction Orchestrator ACCS | Demo command |
 | --- | ---: | ---: | ---: | --- |
 | Coding agent | 0.548 | 0.698 | 0.836 | `npm run demo:coding` |
 | Customer support | 0.410 | 0.474 | 0.773 | `npm run demo:support` |
@@ -130,6 +130,8 @@ It is `plan`.
 
 That plan tells you what the agent chose to keep, extract, externalize, or summarize.
 
+The policy is deterministic in the current alpha. `cost_first` picks the supported strategy with the highest estimated token savings. Other modes use the default safety ordering today: preserve user instructions, extract active errors when allowed, then use the first supported strategy. The strategy interface is pluggable, so you can pass your own strategies into `compact()`.
+
 ## Try the CLI
 
 ```bash
@@ -169,6 +171,8 @@ node packages/core/dist/cli.js import codex ~/.codex/sessions/YYYY/MM/DD/rollout
 ```
 
 Then use **Import JSON** in the UI. The importer skips encrypted reasoning and preserves messages, tool calls, tool outputs, cwd, model, and session metadata.
+
+Imported local traces may contain file paths, tool output, private code, API responses, or secrets. Treat generated fixtures as private until you review or redact them.
 
 ## Try the API and UI
 
