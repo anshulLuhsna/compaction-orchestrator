@@ -57,6 +57,16 @@ You can also pipe JSON through stdin:
 cat session.json | npx @anshulluhsna/compaction-orchestrator
 ```
 
+Import Claude Code or Codex transcripts into UI-ready fixtures:
+
+```bash
+npx @anshulluhsna/compaction-orchestrator import claude ~/.claude/projects/<project>/<session>.jsonl \
+  --out my-claude-session.json
+
+npx @anshulluhsna/compaction-orchestrator import codex ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl \
+  --out my-codex-session.json
+```
+
 ## Persistence
 
 The package root is SDK-first. Persistence is available through an explicit subpath:

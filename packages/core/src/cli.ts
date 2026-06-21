@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { stdin, stdout, stderr } from "node:process";
-import { claudeCodeJsonlToFixture } from "./importers.js";
+import { claudeCodeJsonlToFixture, codexJsonlToFixture } from "./importers.js";
 import { compact } from "./sdk.js";
 import type { CompactInput, CompactMessage } from "./sdk.js";
 
@@ -72,8 +72,8 @@ async function runImport(args: string[]) {
   const source = args[0];
   const inputPath = positionalArgs(args.slice(1))[0];
 
-  if (source !== "claude") {
-    throw new Error("Unknown import source. Supported sources: claude");
+  if (source !== "claude" && source !== "codex") {
+    throw new Error("Unknown import source. Supported sources: claude, codex");
   }
 
   const outPath = valueAfter(args, "--out");
@@ -82,12 +82,19 @@ async function runImport(args: string[]) {
   const desiredBudget = numberAfter(args, "--desired-budget");
   const maxToolOutputChars = numberAfter(args, "--max-tool-output-chars");
   const text = inputPath ? await readFile(inputPath, "utf8") : await readStdin();
-  const fixture = claudeCodeJsonlToFixture(text, {
+  const fixture = source === "claude" ? claudeCodeJsonlToFixture(text, {
     name,
     sourcePath: inputPath,
     objective,
     desiredBudget,
     maxToolOutputChars
+  }) : codexJsonlToFixture(text, {
+    name,
+    sourcePath: inputPath,
+    objective,
+    desiredBudget,
+    maxToolOutputChars,
+    includeDeveloperMessages: args.includes("--include-developer")
   });
   const output = `${JSON.stringify(fixture, null, 2)}\n`;
 
@@ -160,6 +167,7 @@ Usage:
   compaction-orchestrator <fixture.json>
   compaction-orchestrator < fixture.json
   compaction-orchestrator import claude <session.jsonl> [--out fixture.json]
+  compaction-orchestrator import codex <rollout.jsonl> [--out fixture.json]
 
 Input JSON:
   {
@@ -173,8 +181,8 @@ Output:
   JSON summary with operations, metrics, runtime context, and optional contextPackage.
 
 Import:
-  Convert Claude Code JSONL from ~/.claude/projects into a Compaction Orchestrator fixture.
-  Options: --out, --name, --objective, --desired-budget, --max-tool-output-chars.
+  Convert Claude Code JSONL from ~/.claude/projects or Codex JSONL from ~/.codex/sessions into a fixture.
+  Options: --out, --name, --objective, --desired-budget, --max-tool-output-chars, --include-developer.
 `);
 }
 

@@ -156,6 +156,19 @@ node packages/core/dist/cli.js import claude ~/.claude/projects/<project-slug>/<
 
 Then use **Import JSON** in the UI. The importer converts Claude Code JSONL into the same fixture shape as the stock demos.
 
+Import a real Codex session:
+
+```bash
+find ~/.codex/sessions -name "*.jsonl" -type f -print0 \
+  | xargs -0 ls -lt \
+  | head -20
+
+node packages/core/dist/cli.js import codex ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl \
+  --out examples/my-codex-session.json
+```
+
+Then use **Import JSON** in the UI. The importer skips encrypted reasoning and preserves messages, tool calls, tool outputs, cwd, model, and session metadata.
+
 ## Try the API and UI
 
 Start the API:

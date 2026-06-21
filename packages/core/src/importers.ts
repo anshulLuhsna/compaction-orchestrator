@@ -26,6 +26,15 @@ export type ClaudeCodeImportOptions = {
   maxToolOutputChars?: number;
 };
 
+export type CodexImportOptions = {
+  name?: string;
+  sourcePath?: string;
+  objective?: string;
+  desiredBudget?: number;
+  maxToolOutputChars?: number;
+  includeDeveloperMessages?: boolean;
+};
+
 type ClaudeCodeEntry = {
   type?: string;
   uuid?: string;
@@ -51,6 +60,17 @@ type ClaudeContentBlock = {
   input?: unknown;
   tool_use_id?: unknown;
   content?: unknown;
+};
+
+type CodexEntry = {
+  timestamp?: string;
+  type?: string;
+  payload?: UnknownRecord;
+};
+
+type CodexContentBlock = {
+  type?: string;
+  text?: unknown;
 };
 
 export function claudeCodeJsonlToFixture(text: string, options: ClaudeCodeImportOptions = {}): ImportedFixture {
@@ -117,6 +137,152 @@ export function claudeCodeJsonlToFixture(text: string, options: ClaudeCodeImport
       warnings
     }
   };
+}
+
+export function codexJsonlToFixture(text: string, options: CodexImportOptions = {}): ImportedFixture {
+  const events: SessionEventInput[] = [];
+  const warnings: string[] = [];
+  let sessionId: string | undefined;
+  let cwd: string | undefined;
+  let originator: string | undefined;
+  let cliVersion: string | undefined;
+  let model: string | undefined;
+  let skipped = 0;
+
+  for (const [lineIndex, line] of text.split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+
+    let entry: CodexEntry;
+    try {
+      entry = JSON.parse(line) as CodexEntry;
+    } catch {
+      skipped += 1;
+      warnings.push(`line ${lineIndex + 1}: invalid json`);
+      continue;
+    }
+
+    if (entry.type === "session_meta") {
+      sessionId ??= asString(entry.payload?.id);
+      cwd ??= asString(entry.payload?.cwd);
+      originator ??= asString(entry.payload?.originator);
+      cliVersion ??= asString(entry.payload?.cli_version);
+      continue;
+    }
+
+    if (entry.type === "turn_context") {
+      cwd ??= asString(entry.payload?.cwd);
+      model ??= asString(entry.payload?.model);
+      continue;
+    }
+
+    const converted = convertCodexEntry(entry, {
+      includeDeveloperMessages: options.includeDeveloperMessages ?? false,
+      maxToolOutputChars: options.maxToolOutputChars ?? 12000
+    });
+
+    if (converted.length === 0 && entry.type !== "event_msg") {
+      skipped += 1;
+    }
+
+    events.push(...converted);
+  }
+
+  const fallbackName = options.sourcePath ? basename(options.sourcePath).replace(/\.jsonl$/i, "") : "codex-session";
+
+  return {
+    name: options.name ?? `codex-${fallbackName}`,
+    objective: options.objective ?? "prepare context for the next coding-agent turn.",
+    desiredBudget: options.desiredBudget ?? 1200,
+    policy: {
+      mode: "balanced",
+      preserveUserMessagesVerbatim: true,
+      preserveActiveErrorsVerbatim: false,
+      allowExternalRetrieval: true
+    },
+    useCase: "generic",
+    events,
+    expectedFacts: [],
+    metadata: {
+      importer: "codex_jsonl",
+      sourcePath: options.sourcePath,
+      sourceSessionId: sessionId,
+      cwd,
+      originator,
+      codexCliVersion: cliVersion,
+      model,
+      importedEventCount: events.length,
+      skippedEntryCount: skipped,
+      warnings
+    }
+  };
+}
+
+function convertCodexEntry(
+  entry: CodexEntry,
+  options: { includeDeveloperMessages: boolean; maxToolOutputChars: number }
+): SessionEventInput[] {
+  if (entry.type !== "response_item") {
+    return [];
+  }
+
+  const payload = entry.payload ?? {};
+  const payloadType = asString(payload.type);
+  const metadata = baseCodexMetadata(entry);
+
+  if (payloadType === "message") {
+    const role = normalizeRole(asString(payload.role));
+    if (!role || (role === "system" && !options.includeDeveloperMessages)) {
+      return [];
+    }
+
+    const content = codexMessageContent(payload.content);
+    if (!content) {
+      return [];
+    }
+
+    return [{
+      role,
+      type: "message",
+      content,
+      metadata: removeUndefined({
+        ...metadata,
+        codexPhase: payload.phase,
+        semanticType: role === "user" ? "user_instruction" : undefined
+      })
+    }];
+  }
+
+  if (payloadType === "function_call" || payloadType === "custom_tool_call") {
+    const name = asString(payload.name) ?? asString(payload.call_id) ?? "unknown_tool";
+    const args = stringifyUnknown(payload.arguments ?? payload.input);
+    return [{
+      role: "assistant",
+      type: "tool_call",
+      content: args ? `${name}\n${args}` : name,
+      metadata: removeUndefined({
+        ...metadata,
+        toolName: name,
+        toolUseId: payload.call_id,
+        semanticType: "completed_exploration"
+      })
+    }];
+  }
+
+  if (payloadType === "function_call_output" || payloadType === "custom_tool_call_output") {
+    const content = truncateToolOutput(stringifyUnknown(payload.output ?? payload.content), options.maxToolOutputChars, "codex");
+    return content ? [{
+      role: "tool",
+      type: "tool_output",
+      content,
+      metadata: removeUndefined({
+        ...metadata,
+        toolUseId: payload.call_id,
+        semanticType: looksLikeError(content) ? "active_error" : "tool_observation"
+      })
+    }] : [];
+  }
+
+  return [];
 }
 
 function convertClaudeEntry(
@@ -207,7 +373,7 @@ function convertClaudeBlock(
   }
 
   if (block.type === "tool_result") {
-    const content = truncateToolOutput(stringifyUnknown(block.content), options.maxToolOutputChars);
+    const content = truncateToolOutput(stringifyUnknown(block.content), options.maxToolOutputChars, "claude");
     return content ? [{
       role: "tool",
       type: "tool_output",
@@ -259,6 +425,39 @@ function baseEntryMetadata(entry: ClaudeCodeEntry): Record<string, unknown> {
   });
 }
 
+function baseCodexMetadata(entry: CodexEntry): Record<string, unknown> {
+  return removeUndefined({
+    source: "codex_jsonl",
+    codexEntryType: entry.type,
+    codexPayloadType: entry.payload?.type,
+    codexTimestamp: entry.timestamp
+  });
+}
+
+function codexMessageContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (!Array.isArray(content)) {
+    return stringifyUnknown(content).trim();
+  }
+
+  return content
+    .map((block) => codexContentBlockToText(block as CodexContentBlock))
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function codexContentBlockToText(block: CodexContentBlock): string {
+  if (block.type === "input_text" || block.type === "output_text") {
+    return asString(block.text)?.trim() ?? "";
+  }
+
+  return stringifyUnknown(block).trim();
+}
+
 function stringifyUnknown(value: unknown): string {
   if (value === undefined || value === null) {
     return "";
@@ -279,12 +478,12 @@ function stringifyUnknown(value: unknown): string {
   return String(value);
 }
 
-function truncateToolOutput(content: string, maxChars: number): string {
+function truncateToolOutput(content: string, maxChars: number, source: "claude" | "codex"): string {
   if (content.length <= maxChars) {
     return content;
   }
 
-  return `${content.slice(0, maxChars)}\n\n[truncated ${content.length - maxChars} chars from claude tool output]`;
+  return `${content.slice(0, maxChars)}\n\n[truncated ${content.length - maxChars} chars from ${source} tool output]`;
 }
 
 function looksLikeError(content: string): boolean {

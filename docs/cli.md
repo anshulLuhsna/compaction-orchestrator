@@ -63,6 +63,33 @@ Useful options:
 
 The importer preserves user messages, assistant messages, tool calls, tool outputs, source session id, cwd, git branch, timestamps, and Claude UUIDs where available. It leaves `expectedFacts` empty because only you know which facts the next turn must preserve. Add those later if you want meaningful evaluation scores.
 
+## Import Codex Sessions
+
+Codex stores local chat transcripts as JSONL under:
+
+```text
+~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+```
+
+Find recent sessions:
+
+```bash
+find ~/.codex/sessions -name "*.jsonl" -type f -print0 \
+  | xargs -0 ls -lt \
+  | head -20
+```
+
+Convert a Codex session into a fixture:
+
+```bash
+node packages/core/dist/cli.js import codex ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl \
+  --out examples/my-codex-session.json
+```
+
+Then use **Import JSON** in the web UI.
+
+The Codex importer preserves user messages, assistant messages, tool calls, tool outputs, source session id, cwd, model, timestamps, and call ids where available. It skips encrypted reasoning and developer/system messages by default. Add `--include-developer` only if you explicitly want developer/system instructions in the fixture.
+
 Output is JSON with:
 
 - `operations`

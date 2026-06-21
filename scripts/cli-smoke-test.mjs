@@ -93,9 +93,82 @@ assert.ok(importedFixture.events.some((event) => event.type === "tool_call" && e
 assert.ok(importedFixture.events.some((event) => event.type === "tool_output" && event.role === "tool"));
 assert.match(importedFixture.events.map((event) => event.content).join("\n"), /Use Hono only/);
 
+const codexJsonlPath = join(tempDir, "codex-session.jsonl");
+const codexFixturePath = join(tempDir, "codex-fixture.json");
+await writeFile(codexJsonlPath, [
+  JSON.stringify({
+    timestamp: "2026-06-21T00:00:00.000Z",
+    type: "session_meta",
+    payload: {
+      id: "codex-session-1",
+      cwd: "/tmp/project",
+      originator: "Codex Desktop",
+      cli_version: "0.140.0-alpha.19"
+    }
+  }),
+  JSON.stringify({
+    timestamp: "2026-06-21T00:00:01.000Z",
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: "Fix the billing route. Do not add Express." }]
+    }
+  }),
+  JSON.stringify({
+    timestamp: "2026-06-21T00:00:02.000Z",
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "assistant",
+      content: [{ type: "output_text", text: "I will inspect the API route." }]
+    }
+  }),
+  JSON.stringify({
+    timestamp: "2026-06-21T00:00:03.000Z",
+    type: "response_item",
+    payload: {
+      type: "function_call",
+      name: "exec_command",
+      arguments: "{\"cmd\":\"npm run typecheck\"}",
+      call_id: "call-1"
+    }
+  }),
+  JSON.stringify({
+    timestamp: "2026-06-21T00:00:04.000Z",
+    type: "response_item",
+    payload: {
+      type: "function_call_output",
+      call_id: "call-1",
+      output: "Error: Cannot find module './billing-store.js'"
+    }
+  })
+].join("\n"));
+
+await execFileAsync("node", [
+  "packages/core/dist/cli.js",
+  "import",
+  "codex",
+  codexJsonlPath,
+  "--out",
+  codexFixturePath,
+  "--name",
+  "imported-codex-session"
+]);
+
+const codexFixture = JSON.parse(await readFile(codexFixturePath, "utf8"));
+assert.equal(codexFixture.name, "imported-codex-session");
+assert.equal(codexFixture.metadata.importer, "codex_jsonl");
+assert.equal(codexFixture.metadata.sourceSessionId, "codex-session-1");
+assert.equal(codexFixture.events.length, 4);
+assert.ok(codexFixture.events.some((event) => event.type === "tool_call" && event.metadata.toolName === "exec_command"));
+assert.ok(codexFixture.events.some((event) => event.type === "tool_output" && event.metadata.semanticType === "active_error"));
+assert.match(codexFixture.events.map((event) => event.content).join("\n"), /Do not add Express/);
+
 console.log(JSON.stringify({
   ok: true,
   codingOperations: coding.operations.map((operation) => operation.operation),
   supportPackageId: support.contextPackage.id,
-  importedClaudeEvents: importedFixture.events.length
+  importedClaudeEvents: importedFixture.events.length,
+  importedCodexEvents: codexFixture.events.length
 }, null, 2));

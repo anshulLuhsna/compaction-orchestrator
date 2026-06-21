@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileJson,
   Gauge,
+  Info,
   Loader2,
   MessageSquareText,
   Play,
@@ -19,6 +20,7 @@ import { codingFixture, supportFixture, voiceFixture } from "./fixture";
 type JsonRecord = Record<string, any>;
 type DemoKind = "support" | "coding" | "voice" | "custom";
 type LoadingAction = "compact" | "eval" | "status" | null;
+type PolicyMode = "accuracy_first" | "balanced" | "cost_first" | "long_horizon" | "human_controlled";
 
 const defaultApiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -109,6 +111,19 @@ export function App() {
     setEvents([]);
     setExternalized([]);
     setProbe(null);
+  }
+
+  function updateFixturePolicy(nextPolicy: JsonRecord) {
+    if (!fixture) return;
+    setFixtureText(JSON.stringify({
+      ...fixture,
+      policy: {
+        ...(fixture.policy ?? {}),
+        ...nextPolicy
+      }
+    }, null, 2));
+    clearResults();
+    setError(null);
   }
 
   async function importJson(file: File | undefined) {
@@ -254,23 +269,29 @@ export function App() {
               <SmallBadge>{fixtureStats.eventCount} events</SmallBadge>
             </div>
 
-            <div className="mt-4 grid gap-2">
-              {typedDemoEntries().map(([kind, copy]) => (
-                <button
-                  key={kind}
-                  className={[
-                    "rounded-lg border p-3 text-left transition",
-                    selectedDemo === kind ? "border-[#adc6ff] bg-[#12243a]" : "border-[#263547] bg-[#0b1624] hover:border-[#60748d]"
-                  ].join(" ")}
-                  onClick={() => selectDemo(kind)}
-                >
-                  <div className="flex items-center gap-2 font-semibold">
-                    {copy.icon}
-                    {copy.title}
-                  </div>
-                  <p className="mt-1 text-sm leading-5 text-[#9fb0c8]">{copy.short}</p>
-                </button>
-              ))}
+            <div className="mt-4 rounded-lg border border-[#2f4054] bg-[#09182a] p-3">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8ea3c1]" htmlFor="example-session">
+                example session
+              </label>
+              <select
+                id="example-session"
+                className="mt-2 h-10 w-full rounded-md border border-[#40546d] bg-[#0b1624] px-3 text-sm font-semibold text-[#d4e4fa] outline-none focus:border-[#adc6ff]"
+                value={selectedDemo === "custom" ? "custom" : selectedDemo}
+                onChange={(event) => {
+                  const value = event.target.value as DemoKind;
+                  if (value !== "custom") {
+                    selectDemo(value);
+                  }
+                }}
+              >
+                {typedDemoEntries().map(([kind, copy]) => (
+                  <option key={kind} value={kind}>{copy.title}</option>
+                ))}
+                {selectedDemo === "custom" && <option value="custom">Custom imported session</option>}
+              </select>
+              <p className="mt-2 text-sm leading-5 text-[#9fb0c8]">
+                {selectedCopy?.short ?? "Imported JSON session."}
+              </p>
             </div>
 
             <div className="mt-4 rounded-lg border border-[#263547] bg-[#0b1624] p-3">
@@ -283,10 +304,24 @@ export function App() {
               </div>
             </div>
 
+            <PolicyControls fixture={fixture} onChange={updateFixturePolicy} />
+
             <input ref={fileInputRef} className="hidden" type="file" accept="application/json,.json" onChange={(event) => importJson(event.target.files?.[0])} />
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 rounded-lg border border-[#35506c] bg-[#0e2137] p-3">
+              <div className="flex gap-2">
+                <Info className="mt-0.5 h-4 w-4 flex-none text-[#adc6ff]" />
+                <p className="text-sm leading-5 text-[#c8d8ee]">
+                  bring your own session: convert claude code or codex chats with the cli, then import the generated json here.
+                </p>
+              </div>
+              <code className="mt-2 block rounded-md bg-[#07111f] px-3 py-2 font-mono text-[11px] leading-5 text-[#9fb0c8]">
+                import claude ~/.claude/projects/.../session.jsonl --out session.json<br />
+                import codex ~/.codex/sessions/.../rollout.jsonl --out session.json
+              </code>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <Button variant="ghost" onClick={() => fileInputRef.current?.click()} icon={<Upload className="h-4 w-4" />}>Import JSON</Button>
-              <Button variant="ghost" onClick={() => setRawOpen(true)} icon={<FileJson className="h-4 w-4" />}>Raw</Button>
+              <Button variant="ghost" onClick={() => setRawOpen(true)} icon={<FileJson className="h-4 w-4" />}>View raw JSON</Button>
             </div>
           </Panel>
 
@@ -464,6 +499,82 @@ function Metric({ label, value, good }: { label: string; value: string | number;
       <div className="font-mono text-[11px] uppercase tracking-wide text-[#7f92ad]">{label}</div>
       <div className={["mt-2 text-2xl font-semibold", good ? "text-[#4edea3]" : "text-[#d4e4fa]"].join(" ")}>{value}</div>
     </div>
+  );
+}
+
+function PolicyControls({ fixture, onChange }: { fixture: JsonRecord | null; onChange: (policy: JsonRecord) => void }) {
+  const policy = (fixture?.policy ?? {}) as JsonRecord;
+  const mode = (policy.mode ?? "balanced") as PolicyMode;
+
+  return (
+    <div className="mt-4 rounded-lg border border-[#2f4054] bg-[#09182a] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">compaction policy</div>
+          <p className="mt-1 text-sm leading-5 text-[#9fb0c8]">choose the rules the strategy picker must obey.</p>
+        </div>
+        <SmallBadge>{mode}</SmallBadge>
+      </div>
+
+      <label className="mt-3 block text-xs font-semibold uppercase tracking-[0.12em] text-[#8ea3c1]" htmlFor="policy-mode">
+        mode
+      </label>
+      <select
+        id="policy-mode"
+        className="mt-2 h-10 w-full rounded-md border border-[#40546d] bg-[#0b1624] px-3 text-sm font-semibold text-[#d4e4fa] outline-none focus:border-[#adc6ff]"
+        value={mode}
+        onChange={(event) => onChange({ mode: event.target.value as PolicyMode })}
+        disabled={!fixture}
+      >
+        <option value="balanced">balanced</option>
+        <option value="accuracy_first">accuracy_first</option>
+        <option value="cost_first">cost_first</option>
+        <option value="long_horizon">long_horizon</option>
+        <option value="human_controlled">human_controlled</option>
+      </select>
+
+      <div className="mt-3 grid gap-2">
+        <PolicyToggle
+          label="preserve user messages"
+          checked={policy.preserveUserMessagesVerbatim !== false}
+          disabled={!fixture}
+          onChange={(checked) => onChange({ preserveUserMessagesVerbatim: checked })}
+        />
+        <PolicyToggle
+          label="preserve active errors verbatim"
+          checked={policy.preserveActiveErrorsVerbatim !== false}
+          disabled={!fixture}
+          onChange={(checked) => onChange({ preserveActiveErrorsVerbatim: checked })}
+        />
+        <PolicyToggle
+          label="allow external retrieval"
+          checked={policy.allowExternalRetrieval !== false}
+          disabled={!fixture}
+          onChange={(checked) => onChange({ allowExternalRetrieval: checked })}
+        />
+        <PolicyToggle
+          label="require approval for high risk"
+          checked={policy.requireApprovalForHighRiskChanges !== false}
+          disabled={!fixture}
+          onChange={(checked) => onChange({ requireApprovalForHighRiskChanges: checked })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PolicyToggle({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className={["flex items-center justify-between gap-3 rounded-md border border-[#263547] bg-[#0b1624] px-3 py-2 text-sm", disabled ? "opacity-60" : ""].join(" ")}>
+      <span className="text-[#c8d8ee]">{label}</span>
+      <input
+        type="checkbox"
+        className="h-4 w-4 accent-[#adc6ff]"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    </label>
   );
 }
 
